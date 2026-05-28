@@ -9,6 +9,17 @@ const STORAGE_KEYS = {
   FIREBASE_CONFIG: 'jeoktoma_firebase_config'
 };
 
+// 기본 내장 Firebase 설정 (모든 사용자가 설정을 입력하지 않고 즉시 동일한 DB를 연동 및 공유할 수 있도록 지원)
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBRvkgY2NxNN3Saymcx3IrYxDTpxyvBkBs",
+  authDomain: "jeoktoma-fc-73913.firebaseapp.com",
+  projectId: "jeoktoma-fc-73913",
+  storageBucket: "jeoktoma-fc-73913.firebasestorage.app",
+  messagingSenderId: "648282695955",
+  appId: "1:648282695955:web:c404edfeaf3679b8d352e6",
+  measurementId: "G-HDMBZDTN8G"
+};
+
 // 기본 샘플 데이터 (선수단)
 const DEFAULT_PLAYERS = [
   { id: 'p1', name: '손흥민', backNumber: '7', position: 'FW', goals: 12, assists: 6, matches: 15 },
@@ -152,7 +163,15 @@ class DatabaseService {
 
   getFirebaseConfig() {
     const configStr = localStorage.getItem(STORAGE_KEYS.FIREBASE_CONFIG);
-    return configStr ? JSON.parse(configStr) : null;
+    if (configStr) {
+      try {
+        return JSON.parse(configStr);
+      } catch (e) {
+        console.error("Firebase config parsing error", e);
+      }
+    }
+    // 저장된 수동 설정이 없는 경우, 기본 내장된 공용 Firebase 설정을 자동으로 불러옵니다.
+    return DEFAULT_FIREBASE_CONFIG;
   }
 
   getLocalData(key) {
