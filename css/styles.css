@@ -1226,3 +1226,104 @@ button, input, select, textarea {
 .pitch-player.animating {
   transition: left 0.8s cubic-bezier(0.4, 0, 0.2, 1), top 0.8s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
+
+/* ========================================== */
+/* 구글 스프레드시트 실시간 동기화 스타일 추가 */
+/* ========================================== */
+
+/* 동기화 전용 버튼 로딩 회전 애니메이션 */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-animation {
+  animation: spin 1.2s linear infinite;
+  display: inline-block;
+}
+
+/* 회비 화면 연동 인풋 스타일 미세 보정 */
+#dues-gsheet-url {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  width: 100%;
+  max-width: 480px;
+  transition: all 0.25s ease;
+}
+
+#dues-gsheet-url:focus {
+  border-color: var(--primary);
+  background-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+/* 구글 시트 동기화 미리보기 테이블 */
+.dues-preview-table th {
+  background-color: rgba(15, 23, 42, 0.85);
+  font-weight: 700;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.dues-preview-table td {
+  padding: 12px 14px;
+  font-size: 0.85rem;
+  vertical-align: middle;
+  background-color: rgba(15, 23, 42, 0.4);
+}
+
+.dues-preview-table tr.unmatched-row td {
+  background-color: rgba(239, 68, 68, 0.03);
+}
+
+/* 미리보기 모달 배지 상태 */
+.badge-match-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--primary);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.badge-match-fail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+/* 수납 내역 증감 컬러 레이블 */
+.change-increment {
+  color: var(--primary);
+  font-weight: 800;
+  font-size: 0.8rem;
+  background: rgba(16, 185, 129, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.change-decrement {
+  color: var(--danger);
+  font-weight: 800;
+  font-size: 0.8rem;
+  background: rgba(239, 68, 68, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.change-no {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+

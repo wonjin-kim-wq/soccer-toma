@@ -6,7 +6,8 @@ const STORAGE_KEYS = {
   DUES: 'jeoktoma_dues',
   TACTICS: 'jeoktoma_tactics',
   SCHEDULES: 'jeoktoma_schedules',
-  FIREBASE_CONFIG: 'jeoktoma_firebase_config'
+  FIREBASE_CONFIG: 'jeoktoma_firebase_config',
+  GSHEET_URL: 'jeoktoma_gsheet_url'
 };
 
 // 기본 내장 Firebase 설정 (모든 사용자가 설정을 입력하지 않고 즉시 동일한 DB를 연동 및 공유할 수 있도록 지원)
@@ -478,10 +479,50 @@ class DatabaseService {
         await setDoc(doc(this.firestore, "schedules", id), scheduleData);
       }
 
+      // 5. 구글 시트 URL 업로드 [NEW]
+      const localGSheetUrl = this.getLocalData(STORAGE_KEYS.GSHEET_URL);
+      if (localGSheetUrl) {
+        await setDoc(doc(this.firestore, "config", "google_sheets"), { url: localGSheetUrl, updatedAt: Date.now() });
+      }
+
       console.log("모든 로컬 데이터가 Firebase에 업로드 동기화되었습니다!");
     } catch (e) {
       console.error("로컬 -> Firebase 동기화 진행 중 오류 발생:", e);
     }
+  }
+
+  // 6. 구글 스프레드시트 연동 URL 관리 [NEW]
+  async getGoogleSheetUrl() {
+    if (this.isConnected) {
+      try {
+        const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const docRef = doc(this.firestore, "config", "google_sheets");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const urlData = docSnap.data();
+          if (urlData && urlData.url) {
+            this.saveLocalData(STORAGE_KEYS.GSHEET_URL, urlData.url);
+            return urlData.url;
+          }
+        }
+      } catch (error) {
+        console.warn("Firestore에서 구글 시트 URL을 가져오지 못해 로컬 저장소를 반환합니다.", error);
+      }
+    }
+    return this.getLocalData(STORAGE_KEYS.GSHEET_URL) || '';
+  }
+
+  async saveGoogleSheetUrl(url) {
+    this.saveLocalData(STORAGE_KEYS.GSHEET_URL, url);
+    if (this.isConnected) {
+      try {
+        const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        await setDoc(doc(this.firestore, "config", "google_sheets"), { url, updatedAt: Date.now() });
+      } catch (error) {
+        console.error("Firestore에 구글 시트 URL 저장 실패:", error);
+      }
+    }
+    return url;
   }
 }
 
