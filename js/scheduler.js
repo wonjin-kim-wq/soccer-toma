@@ -25,21 +25,30 @@ class SchedulerService {
       this.onScheduleUpdateCallback = onScheduleUpdate;
     }
 
-    // 버튼 바인딩
-    document.getElementById('btn-calendar-prev').addEventListener('click', () => {
-      this.currentDate.setMonth(this.currentDate.getMonth() - 1);
-      this.render();
-    });
+    // 버튼 방어 코드 바인딩
+    const btnPrev = document.getElementById('btn-calendar-prev');
+    if (btnPrev) {
+      btnPrev.addEventListener('click', () => {
+        this.currentDate.setMonth(this.currentDate.getMonth() - 1);
+        this.render();
+      });
+    }
 
-    document.getElementById('btn-calendar-next').addEventListener('click', () => {
-      this.currentDate.setMonth(this.currentDate.getMonth() + 1);
-      this.render();
-    });
+    const btnNext = document.getElementById('btn-calendar-next');
+    if (btnNext) {
+      btnNext.addEventListener('click', () => {
+        this.currentDate.setMonth(this.currentDate.getMonth() + 1);
+        this.render();
+      });
+    }
 
     // 신규 일정 등록 버튼
-    document.getElementById('btn-add-schedule').addEventListener('click', () => {
-      this.openAddModal();
-    });
+    const btnAdd = document.getElementById('btn-add-schedule');
+    if (btnAdd) {
+      btnAdd.addEventListener('click', () => {
+        this.openAddModal();
+      });
+    }
 
     // 일정 저장 폼 제출
     if (this.form) {

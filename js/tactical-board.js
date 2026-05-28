@@ -388,75 +388,93 @@ class TacticalBoard {
   // ==========================================
 
   setupAnimationEvents() {
-    // 1. 타임라인 이전/다음 스텝 전환 버튼
-    document.getElementById('btn-anim-prev-frame').addEventListener('click', () => {
-      if (this.isPlaying) return;
-      if (this.activeFrameIndex > 0) {
-        this.saveCurrentStateToActiveFrame(); // 현재 위치 임시저장
-        this.activeFrameIndex--;
-        this.loadFrameState(this.activeFrameIndex);
-        this.updateTimelineIndicator();
-      }
-    });
+    // 1. 타임라인 이전/다음 스텝 전환 버튼 방어 바인딩
+    const btnPrevFrame = document.getElementById('btn-anim-prev-frame');
+    if (btnPrevFrame) {
+      btnPrevFrame.addEventListener('click', () => {
+        if (this.isPlaying) return;
+        if (this.activeFrameIndex > 0) {
+          this.saveCurrentStateToActiveFrame(); // 현재 위치 임시저장
+          this.activeFrameIndex--;
+          this.loadFrameState(this.activeFrameIndex);
+          this.updateTimelineIndicator();
+        }
+      });
+    }
 
-    document.getElementById('btn-anim-next-frame').addEventListener('click', () => {
-      if (this.isPlaying) return;
-      if (this.activeFrameIndex < this.frames.length - 1) {
+    const btnNextFrame = document.getElementById('btn-anim-next-frame');
+    if (btnNextFrame) {
+      btnNextFrame.addEventListener('click', () => {
+        if (this.isPlaying) return;
+        if (this.activeFrameIndex < this.frames.length - 1) {
+          this.saveCurrentStateToActiveFrame();
+          this.activeFrameIndex++;
+          this.loadFrameState(this.activeFrameIndex);
+          this.updateTimelineIndicator();
+        }
+      });
+    }
+
+    // 2. 프레임 추가/삭제 버튼 방어 바인딩
+    const btnAddFrame = document.getElementById('btn-anim-add-frame');
+    if (btnAddFrame) {
+      btnAddFrame.addEventListener('click', () => {
+        if (this.isPlaying) return;
         this.saveCurrentStateToActiveFrame();
+        
+        // 현재 프레임의 선수 좌표를 바탕으로 새로운 복제 프레임 추가
+        const newFrame = {
+          positions: JSON.parse(JSON.stringify(this.frames[this.activeFrameIndex].positions)),
+          drawings: '' // 드로잉 펜 선은 신규 프레임에서는 깔끔하게 시작
+        };
+
+        this.frames.splice(this.activeFrameIndex + 1, 0, newFrame);
         this.activeFrameIndex++;
         this.loadFrameState(this.activeFrameIndex);
         this.updateTimelineIndicator();
-      }
-    });
+      });
+    }
 
-    // 2. 프레임 추가/삭제 버튼
-    document.getElementById('btn-anim-add-frame').addEventListener('click', () => {
-      if (this.isPlaying) return;
-      this.saveCurrentStateToActiveFrame();
-      
-      // 현재 프레임의 선수 좌표를 바탕으로 새로운 복제 프레임 추가
-      const newFrame = {
-        positions: JSON.parse(JSON.stringify(this.frames[this.activeFrameIndex].positions)),
-        drawings: '' // 드로잉 펜 선은 신규 프레임에서는 깔끔하게 시작
-      };
+    const btnDeleteFrame = document.getElementById('btn-anim-delete-frame');
+    if (btnDeleteFrame) {
+      btnDeleteFrame.addEventListener('click', () => {
+        if (this.isPlaying) return;
+        if (this.frames.length <= 1) {
+          alert('최소 1개의 전술 스텝이 필요합니다.');
+          return;
+        }
 
-      this.frames.splice(this.activeFrameIndex + 1, 0, newFrame);
-      this.activeFrameIndex++;
-      this.loadFrameState(this.activeFrameIndex);
-      this.updateTimelineIndicator();
-    });
+        if (confirm('현재 스텝을 삭제하시겠습니까?')) {
+          this.frames.splice(this.activeFrameIndex, 1);
+          this.activeFrameIndex = Math.max(0, this.activeFrameIndex - 1);
+          this.loadFrameState(this.activeFrameIndex);
+          this.updateTimelineIndicator();
+        }
+      });
+    }
 
-    document.getElementById('btn-anim-delete-frame').addEventListener('click', () => {
-      if (this.isPlaying) return;
-      if (this.frames.length <= 1) {
-        alert('최소 1개의 전술 스텝이 필요합니다.');
-        return;
-      }
-
-      if (confirm('현재 스텝을 삭제하시겠습니까?')) {
-        this.frames.splice(this.activeFrameIndex, 1);
-        this.activeFrameIndex = Math.max(0, this.activeFrameIndex - 1);
-        this.loadFrameState(this.activeFrameIndex);
-        this.updateTimelineIndicator();
-      }
-    });
-
-    // 3. 재생 / 정지 / 일시정지 컨트롤
+    // 3. 재생 / 정지 / 일시정지 컨트롤 방어 바인딩
     const btnPlay = document.getElementById('btn-anim-play');
     const btnPause = document.getElementById('btn-anim-pause');
     const btnStop = document.getElementById('btn-anim-stop');
 
-    btnPlay.addEventListener('click', () => {
-      this.playAnimation();
-    });
+    if (btnPlay) {
+      btnPlay.addEventListener('click', () => {
+        this.playAnimation();
+      });
+    }
 
-    btnPause.addEventListener('click', () => {
-      this.pauseAnimation();
-    });
+    if (btnPause) {
+      btnPause.addEventListener('click', () => {
+        this.pauseAnimation();
+      });
+    }
 
-    btnStop.addEventListener('click', () => {
-      this.stopAnimation();
-    });
+    if (btnStop) {
+      btnStop.addEventListener('click', () => {
+        this.stopAnimation();
+      });
+    }
   }
 
   // 타임라인 인디케이터 라벨 업데이트 (예: '스텝 2 / 4')
