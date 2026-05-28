@@ -163,6 +163,76 @@
           </div>
         </div>
 
+        <!-- DASHBOARD STARTING LINEUP BUILDER [NEW] -->
+        <div id="dashboard-lineup-container" class="card" style="display: none; margin-bottom: 24px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.08) 100%); border-color: rgba(16, 185, 129, 0.2); padding: 24px;">
+          <h3 class="card-title" style="margin-bottom: 4px;"><i class="fa-solid fa-people-group" style="color: var(--primary);"></i> 경기 선발 라인업 설정</h3>
+          <p id="lineup-match-title" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">다음 경기: [상대팀]전 선발 명단을 설정해 주세요. (경기 7일 전 활성)</p>
+          
+          <div class="mini-pitch">
+            <!-- Field markings -->
+            <div class="mini-pitch-halfline"></div>
+            <div class="mini-pitch-centercircle"></div>
+            
+            <!-- Nodes (4-4-2 vertical formation) -->
+            <!-- FW -->
+            <div class="mini-pitch-node fw" style="bottom: 78%; left: 33%;">
+              <span class="node-label">LS</span>
+              <select class="node-select" data-position="ls"></select>
+            </div>
+            <div class="mini-pitch-node fw" style="bottom: 78%; left: 67%;">
+              <span class="node-label">RS</span>
+              <select class="node-select" data-position="rs"></select>
+            </div>
+            
+            <!-- MF -->
+            <div class="mini-pitch-node mf" style="bottom: 48%; left: 14%;">
+              <span class="node-label">LM</span>
+              <select class="node-select" data-position="lm"></select>
+            </div>
+            <div class="mini-pitch-node mf" style="bottom: 45%; left: 38%;">
+              <span class="node-label">LCM</span>
+              <select class="node-select" data-position="lcm"></select>
+            </div>
+            <div class="mini-pitch-node mf" style="bottom: 45%; left: 62%;">
+              <span class="node-label">RCM</span>
+              <select class="node-select" data-position="rcm"></select>
+            </div>
+            <div class="mini-pitch-node mf" style="bottom: 48%; left: 86%;">
+              <span class="node-label">RM</span>
+              <select class="node-select" data-position="rm"></select>
+            </div>
+            
+            <!-- DF -->
+            <div class="mini-pitch-node df" style="bottom: 22%; left: 14%;">
+              <span class="node-label">LB</span>
+              <select class="node-select" data-position="lb"></select>
+            </div>
+            <div class="mini-pitch-node df" style="bottom: 18%; left: 38%;">
+              <span class="node-label">LCB</span>
+              <select class="node-select" data-position="lcb"></select>
+            </div>
+            <div class="mini-pitch-node df" style="bottom: 18%; left: 62%;">
+              <span class="node-label">RCB</span>
+              <select class="node-select" data-position="rcb"></select>
+            </div>
+            <div class="mini-pitch-node df" style="bottom: 22%; left: 86%;">
+              <span class="node-label">RB</span>
+              <select class="node-select" data-position="rb"></select>
+            </div>
+            
+            <!-- GK -->
+            <div class="mini-pitch-node gk" style="bottom: 4%; left: 50%; transform: translateX(-50%);">
+              <span class="node-label">GK</span>
+              <select class="node-select" data-position="gk"></select>
+            </div>
+          </div>
+          
+          <div style="text-align: center; margin-top: 14px; font-size: 0.75rem; color: var(--text-muted); display:flex; align-items:center; justify-content:center; gap:6px;">
+            <i class="fa-solid fa-circle-info" style="color:var(--primary);"></i>
+            <span>선수를 선택하시면 실시간으로 라인업이 자동 저장 및 동기화됩니다.</span>
+          </div>
+        </div>
+
         <!-- Statistics Widgets -->
         <div class="grid-container">
           <div class="card">

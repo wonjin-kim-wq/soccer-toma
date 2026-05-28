@@ -10,7 +10,8 @@ const STORAGE_KEYS = {
   GSHEET_URL: 'jeoktoma_gsheet_url',
   FEEDBACK: 'jeoktoma_feedback',
   MATCH_FEEDBACK: 'jeoktoma_match_feedback',
-  VOTES: 'jeoktoma_votes'
+  VOTES: 'jeoktoma_votes',
+  LINEUPS: 'jeoktoma_lineups'
 };
 
 // 기본 내장 Firebase 설정 (모든 사용자가 설정을 입력하지 않고 즉시 동일한 DB를 연동 및 공유할 수 있도록 지원)
@@ -100,6 +101,9 @@ class DatabaseService {
     }
     if (!localStorage.getItem(STORAGE_KEYS.SCHEDULES)) {
       localStorage.setItem(STORAGE_KEYS.SCHEDULES, JSON.stringify(DEFAULT_SCHEDULES));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.LINEUPS)) {
+      localStorage.setItem(STORAGE_KEYS.LINEUPS, JSON.stringify({}));
     }
 
     const config = this.getFirebaseConfig();
@@ -506,6 +510,12 @@ class DatabaseService {
         await setDoc(doc(this.firestore, "votes", matchId), localVotes[matchId]);
       }
 
+      // 9. 선발 라인업 업로드 [NEW]
+      const localLineups = this.getLocalData(STORAGE_KEYS.LINEUPS) || {};
+      for (const matchId in localLineups) {
+        await setDoc(doc(this.firestore, "lineups", matchId), { matchId, players: localLineups[matchId] });
+      }
+
       console.log("모든 로컬 데이터가 Firebase에 업로드 동기화되었습니다!");
     } catch (e) {
       console.error("로컬 -> Firebase 동기화 진행 중 오류 발생:", e);
@@ -690,6 +700,44 @@ class DatabaseService {
       }
     }
     return votes;
+  }
+
+  // 10. 선발 라인업 관리 [NEW]
+  async getLineup(matchId) {
+    if (this.isConnected) {
+      try {
+        const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const docRef = doc(this.firestore, "lineups", matchId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const all = this.getLocalData(STORAGE_KEYS.LINEUPS) || {};
+          all[matchId] = data.players || {};
+          this.saveLocalData(STORAGE_KEYS.LINEUPS, all);
+          return data.players || {};
+        }
+      } catch (e) {
+        console.warn("Firestore에서 선발 라인업을 불러오지 못해 로컬 저장소를 반환합니다.", e);
+      }
+    }
+    const all = this.getLocalData(STORAGE_KEYS.LINEUPS) || {};
+    return all[matchId] || {};
+  }
+
+  async saveLineup(matchId, playersData) {
+    const all = this.getLocalData(STORAGE_KEYS.LINEUPS) || {};
+    all[matchId] = playersData;
+    this.saveLocalData(STORAGE_KEYS.LINEUPS, all);
+
+    if (this.isConnected) {
+      try {
+        const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        await setDoc(doc(this.firestore, "lineups", matchId), { matchId, players: playersData });
+      } catch (e) {
+        console.error("Firestore에 선발 라인업 저장 실패:", e);
+      }
+    }
+    return playersData;
   }
 }
 

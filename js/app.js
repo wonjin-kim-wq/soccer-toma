@@ -28,6 +28,7 @@ class AppController {
       await duesManager.updatePlayersList(playersList);
       await feedbackManager.updatePlayersList(playersList);
       this.updateVotingPlayersList(playersList); // [NEW] 투표용 선수 목록 동적 반영
+      this.updateLineupPlayersList(playersList); // [NEW] 선발 라인업 선수 목록 동적 반영
     });
     
     duesManager.init();
@@ -36,10 +37,11 @@ class AppController {
     matchFeedbackManager.init(); // [NEW] 경기 피드백 매니저 초기화
     
     // [NEW] 경기 일정 서비스 모듈 구동
-    // 일정이 추가되거나 변경되면 -> 대시보드 상단 D-Day 및 투표 위젯 갱신
+    // 일정이 추가되거나 변경되면 -> 대시보드 상단 D-Day, 투표, 선발 라인업 위젯 갱신
     await schedulerService.init((schedules) => {
       this.updateDashboardDday(schedules);
       this.checkDashboardVoting(schedules); // [NEW] 베스트/워스트 투표 가용성 체크
+      this.checkDashboardLineup(schedules); // [NEW] 선발 라인업 가용성 체크
       matchFeedbackManager.updateSchedulesList(schedules); // [NEW] 피드백 경기 리스트 갱신
     });
 
@@ -488,6 +490,88 @@ class AppController {
         </div>
       `;
     }).join('');
+  }
+
+  // [NEW] 대시보드 선발 라인업 스케줄러 노출 체크 모듈
+  async checkDashboardLineup(schedules) {
+    const container = document.getElementById('dashboard-lineup-container');
+    const title = document.getElementById('lineup-match-title');
+    if (!container || !title) return;
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    const today = new Date(todayStr + 'T00:00:00');
+    
+    // 7 days upcoming window (today <= date <= today + 7)
+    const upcoming = schedules.filter(s => {
+      if (s.date < todayStr) return false;
+      const matchDate = new Date(s.date + 'T00:00:00');
+      const diffTime = matchDate - today;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays <= 7;
+    }).sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    if (upcoming.length === 0) {
+      container.style.display = 'none';
+      return;
+    }
+    
+    const targetMatch = upcoming[0];
+    container.style.display = 'block';
+    
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    const dayName = days[new Date(targetMatch.date).getDay()];
+    title.innerHTML = `⚽ <strong>${targetMatch.date.replace(/-/g, '/')} (${dayName}) 상대: ${targetMatch.opponent}</strong> 경기 선발 라인업을 배치해 주세요. (경기 일주일 전 활성)`;
+    
+    this.currentLineupMatchId = targetMatch.id;
+    await this.restoreLineup(targetMatch.id);
+  }
+
+  // 선발 라인업 드롭다운 채우기
+  updateLineupPlayersList(playersList) {
+    this.cachedPlayers = playersList;
+    const selects = document.querySelectorAll('.mini-pitch .node-select');
+    selects.forEach(select => {
+      const pos = select.dataset.position;
+      const placeholder = `<option value="" disabled selected>${pos.toUpperCase()}</option>`;
+      const options = playersList.map(p => `<option value="${p.id}">${p.name} (#${p.backNumber})</option>`).join('');
+      select.innerHTML = placeholder + options + `<option value="none">선택 안함</option>`;
+      
+      if (select.dataset.listenerBound !== 'true') {
+        select.dataset.listenerBound = 'true';
+        select.addEventListener('change', () => this.autoSaveLineup());
+      }
+    });
+    
+    // 비동기 레이스 컨디션 방지: 이미 경기 ID가 활성화된 경우 로딩된 선수 옵션들에 맞춰 선택 상태 복원
+    if (this.currentLineupMatchId) {
+      this.restoreLineup(this.currentLineupMatchId);
+    }
+  }
+
+  // 기존 저장된 라인업 복원
+  async restoreLineup(matchId) {
+    const playersData = await dbService.getLineup(matchId);
+    const selects = document.querySelectorAll('.mini-pitch .node-select');
+    selects.forEach(select => {
+      const pos = select.dataset.position;
+      select.value = playersData[pos] || '';
+    });
+  }
+
+  // 선발 라인업 자동 실시간 저장
+  async autoSaveLineup() {
+    if (!this.currentLineupMatchId) return;
+    const playersData = {};
+    const selects = document.querySelectorAll('.mini-pitch .node-select');
+    selects.forEach(select => {
+      const pos = select.dataset.position;
+      if (select.value && select.value !== 'none') {
+        playersData[pos] = select.value;
+      } else {
+        playersData[pos] = '';
+      }
+    });
+    await dbService.saveLineup(this.currentLineupMatchId, playersData);
   }
 }
 
