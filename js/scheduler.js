@@ -157,6 +157,13 @@ class SchedulerService {
         badge.className = 'calendar-match-badge';
         badge.innerHTML = `<i class="fa-solid fa-futbol" style="font-size:0.6rem; margin-right:3px;"></i>${m.opponent}`;
         badge.title = `${m.opponent} 매치 (${m.time}) - ${m.location}`;
+        
+        // [고도화]: 달력 내 등록된 일정 배지 클릭 시 즉시 상세 수정 모달을 오픈합니다. (날짜 클릭 전파 완벽 차단)
+        badge.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.openEditModal(m);
+        });
+        
         cell.appendChild(badge);
       });
     }
@@ -204,7 +211,11 @@ class SchedulerService {
 
       return `
         <div class="match-schedule-card" data-id="${s.id}">
-          <button class="btn-delete-schedule" title="경기 일정 삭제"><i class="fa-solid fa-xmark"></i></button>
+          <!-- [고도화]: 상단 액션 영역에 펜(수정) 버튼 추가 배치 -->
+          <div style="position: absolute; top: 14px; right: 14px; display: flex; gap: 8px; z-index: 5;">
+            <button class="btn-edit-schedule" title="경기 일정 수정" style="background: none; border: none; color: var(--text-muted); cursor: pointer; transition: color 0.2s; padding: 4px;"><i class="fa-solid fa-pen"></i></button>
+            <button class="btn-delete-schedule" title="경기 일정 삭제" style="background: none; border: none; color: var(--text-muted); cursor: pointer; transition: color 0.2s; padding: 4px;"><i class="fa-solid fa-xmark"></i></button>
+          </div>
           
           <div class="match-header">
             <span class="match-date-badge">${s.date.replace(/-/g, '/')} (${dayName})</span>
@@ -228,6 +239,19 @@ class SchedulerService {
         </div>
       `;
     }).join('');
+
+    // 일정 카드 수정 이벤트 바인딩
+    this.upcomingList.querySelectorAll('.btn-edit-schedule').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const card = e.target.closest('.match-schedule-card');
+        const id = card.dataset.id;
+        const schedule = this.schedules.find(s => s.id === id);
+        if (schedule) {
+          this.openEditModal(schedule);
+        }
+      });
+    });
 
     // 일정 카드 삭제 이벤트 바인딩
     this.upcomingList.querySelectorAll('.btn-delete-schedule').forEach(btn => {
@@ -259,6 +283,20 @@ class SchedulerService {
     }
     
     document.getElementById('schedule-time').value = '10:00';
+    this.modal.classList.add('active');
+  }
+
+  // [고도화]: 기존 경기 일정 수정 모달 열기
+  openEditModal(schedule) {
+    this.modalTitle.textContent = "경기 일정 수정";
+    this.form.reset();
+    document.getElementById('schedule-id').value = schedule.id;
+    document.getElementById('schedule-opponent').value = schedule.opponent;
+    document.getElementById('schedule-date').value = schedule.date;
+    document.getElementById('schedule-time').value = schedule.time;
+    document.getElementById('schedule-location').value = schedule.location;
+    document.getElementById('schedule-description').value = schedule.description || '';
+    
     this.modal.classList.add('active');
   }
 
