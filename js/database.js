@@ -7,7 +7,8 @@ const STORAGE_KEYS = {
   TACTICS: 'jeoktoma_tactics',
   SCHEDULES: 'jeoktoma_schedules',
   FIREBASE_CONFIG: 'jeoktoma_firebase_config',
-  GSHEET_URL: 'jeoktoma_gsheet_url'
+  GSHEET_URL: 'jeoktoma_gsheet_url',
+  FEEDBACK: 'jeoktoma_feedback'
 };
 
 // 기본 내장 Firebase 설정 (모든 사용자가 설정을 입력하지 않고 즉시 동일한 DB를 연동 및 공유할 수 있도록 지원)
@@ -485,6 +486,12 @@ class DatabaseService {
         await setDoc(doc(this.firestore, "config", "google_sheets"), { url: localGSheetUrl, updatedAt: Date.now() });
       }
 
+      // 6. 피드백 데이터 업로드 [NEW]
+      const localFeedback = this.getLocalData(STORAGE_KEYS.FEEDBACK) || {};
+      for (const playerId in localFeedback) {
+        await setDoc(doc(this.firestore, "feedback", playerId), { comments: localFeedback[playerId] });
+      }
+
       console.log("모든 로컬 데이터가 Firebase에 업로드 동기화되었습니다!");
     } catch (e) {
       console.error("로컬 -> Firebase 동기화 진행 중 오류 발생:", e);
@@ -523,6 +530,46 @@ class DatabaseService {
       }
     }
     return url;
+  }
+
+  // 7. 개인 피드백 및 코멘트 관리 [NEW]
+  async getFeedback(playerId) {
+    if (this.isConnected) {
+      try {
+        const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const docRef = doc(this.firestore, "feedback", playerId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const fbData = docSnap.data();
+          const allFb = this.getLocalData(STORAGE_KEYS.FEEDBACK) || {};
+          allFb[playerId] = fbData.comments || [];
+          this.saveLocalData(STORAGE_KEYS.FEEDBACK, allFb);
+          return fbData.comments || [];
+        }
+      } catch (error) {
+        console.warn("Firestore에서 피드백 데이터를 불러오지 못해 로컬 저장소를 반환합니다.", error);
+      }
+    }
+    const allFb = this.getLocalData(STORAGE_KEYS.FEEDBACK) || {};
+    return allFb[playerId] || [];
+  }
+
+  async saveFeedbackComment(playerId, comment) {
+    const allFb = this.getLocalData(STORAGE_KEYS.FEEDBACK) || {};
+    if (!allFb[playerId]) allFb[playerId] = [];
+    
+    allFb[playerId].push(comment);
+    this.saveLocalData(STORAGE_KEYS.FEEDBACK, allFb);
+
+    if (this.isConnected) {
+      try {
+        const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        await setDoc(doc(this.firestore, "feedback", playerId), { comments: allFb[playerId] });
+      } catch (error) {
+        console.error("Firestore에 피드백 저장 실패:", error);
+      }
+    }
+    return comment;
   }
 }
 

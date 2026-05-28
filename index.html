@@ -54,6 +54,12 @@
             <span>회비 관리</span>
           </a>
         </li>
+        <li>
+          <a class="menu-item" data-target="view-feedback">
+            <i class="fa-solid fa-comments"></i>
+            <span>개인 피드백</span>
+          </a>
+        </li>
       </ul>
       
       <div class="sidebar-footer">
@@ -502,6 +508,68 @@
                 <!-- Dynamic Player Dues Rows -->
               </tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 6: Personal Feedback & Timeline [NEW] -->
+      <section id="view-feedback" class="content-view">
+        <div class="feedback-layout">
+          <!-- Left: Player Selection List Panel -->
+          <div class="card feedback-player-sidebar">
+            <h3 class="card-title" style="margin-bottom: 16px;">
+              <i class="fa-solid fa-users" style="color: var(--primary);"></i> 선수 목록
+            </h3>
+            <div class="search-input-wrapper" style="max-width: 100%; margin-bottom: 16px;">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="feedback-player-search" class="search-input" placeholder="선수 이름 검색...">
+            </div>
+            <div id="feedback-player-list" class="feedback-player-list-container">
+              <!-- JS Dynamic Player Cards -->
+            </div>
+          </div>
+
+          <!-- Right: Comments & Summary Panel -->
+          <div class="feedback-main-panel">
+            <!-- Selected Player Profile Header -->
+            <div id="feedback-player-header-card" class="card feedback-profile-card">
+              <!-- JS Dynamic Profile Data -->
+              <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                <i class="fa-solid fa-user-pen" style="font-size: 2.5rem; margin-bottom: 12px; opacity: 0.5;"></i>
+                <p>왼쪽 목록에서 선수를 선택하시면 개인 피드백이 로드됩니다.</p>
+              </div>
+            </div>
+
+            <!-- Comment Section Container -->
+            <div id="feedback-comments-card" class="card feedback-comments-box" style="display: none;">
+              <h3 class="card-title" style="margin-bottom: 20px;">
+                <i class="fa-solid fa-comments" style="color: var(--accent);"></i> 피드백 및 코멘트
+              </h3>
+              
+              <!-- Timeline Scrollable -->
+              <div id="feedback-timeline" class="feedback-timeline-container">
+                <!-- JS Dynamic comments -->
+              </div>
+
+              <!-- Write Form -->
+              <form id="feedback-comment-form" class="feedback-form-box" style="border-top: 1px solid var(--border-color); padding-top: 20px; margin-top: 16px;">
+                <div class="form-row" style="margin-bottom: 12px;">
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label for="feedback-writer" style="font-size: 0.8rem;">작성자 닉네임 (미기재 시 익명)</label>
+                    <input type="text" id="feedback-writer" class="form-control" placeholder="예: 축구광팬 (익명)" style="height: 38px; font-size: 0.85rem;">
+                  </div>
+                  <div style="display: flex; align-items: flex-end; justify-content: flex-end;">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="feedback-content" style="font-size: 0.8rem;">피드백 코멘트 작성</label>
+                  <textarea id="feedback-content" class="form-control" rows="3" placeholder="선수에게 따뜻한 응원의 한마디나 피드백을 남겨주세요..." required style="resize: none; background-color: rgba(22, 28, 45, 0.9); font-size: 0.85rem; padding: 10px 12px;"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; height: 42px; font-size: 0.9rem; font-weight: 700;">
+                  <i class="fa-solid fa-paper-plane" style="margin-right: 6px;"></i> 피드백 등록하기
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </section>

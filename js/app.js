@@ -6,6 +6,7 @@ import { playerRecords } from './player-records.js';
 import { duesManager } from './dues-manager.js';
 import { tacticalBoard } from './tactical-board.js';
 import { schedulerService } from './scheduler.js'; // [NEW] 경기 일정 관리자
+import { feedbackManager } from './feedback-manager.js'; // [NEW] 개인 피드백 관리자
 
 class AppController {
   constructor() {
@@ -21,13 +22,15 @@ class AppController {
     });
 
     // 2. 모듈별 생명주기 및 초기화 시작
-    // 선수 데이터 갱신 시 -> 회비 매니저에 즉각 플레이어 목록 갱신 연계 바인딩
+    // 선수 데이터 갱신 시 -> 회비 매니저 및 피드백 매니저에 즉각 플레이어 목록 갱신 연계 바인딩
     playerRecords.init(async (playersList) => {
       await duesManager.updatePlayersList(playersList);
+      await feedbackManager.updatePlayersList(playersList);
     });
     
     duesManager.init();
     tacticalBoard.init();
+    feedbackManager.init();
     
     // [NEW] 경기 일정 서비스 모듈 구동
     // 일정이 추가되거나 변경되면 -> 대시보드 상단 D-Day 위젯 카드 갱신
