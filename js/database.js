@@ -637,10 +637,15 @@ class DatabaseService {
   }
 
   async saveMatchVideoUrl(matchId, url) {
+    return this.saveMatchVideoUrls(matchId, [url]);
+  }
+
+  async saveMatchVideoUrls(matchId, urls) {
     const schedules = await this.getSchedules();
     const match = schedules.find(s => s.id === matchId);
     if (match) {
-      match.videoUrl = url;
+      match.videoUrls = urls;
+      match.videoUrl = urls[0] || ''; // 하위 호환성용
       this.saveLocalData(STORAGE_KEYS.SCHEDULES, schedules);
       
       if (this.isConnected) {
@@ -649,11 +654,11 @@ class DatabaseService {
           const { id, ...scheduleData } = match;
           await setDoc(doc(this.firestore, "schedules", id), scheduleData);
         } catch (error) {
-          console.error("Firestore에 경기 영상 링크 저장 실패:", error);
+          console.error("Firestore에 경기 영상 링크들 저장 실패:", error);
         }
       }
     }
-    return url;
+    return urls;
   }
 
   // 9. 대시보드 베스트 & 워스트 투표 관리 [NEW]

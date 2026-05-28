@@ -66,7 +66,7 @@ class MatchFeedbackManager {
 
     this.matchListEl.innerHTML = this.matches.map(m => {
       const isActive = m.id === this.selectedMatchId;
-      const hasVideo = !!m.videoUrl;
+      const hasVideo = (m.videoUrls && m.videoUrls.length > 0) || !!m.videoUrl;
       
       const days = ['일', '월', '화', '수', '목', '금', '토'];
       const dayName = days[new Date(m.date).getDay()];
@@ -101,6 +101,8 @@ class MatchFeedbackManager {
   // 특정 경기 선택
   async selectMatch(matchId) {
     this.selectedMatchId = matchId;
+    this.isEditingVideoUrls = false;
+    this.editingUrls = null;
 
     if (this.matchListEl) {
       this.matchListEl.querySelectorAll('.feedback-player-item').forEach(item => {
@@ -148,44 +150,134 @@ class MatchFeedbackManager {
   renderVideoCard(match) {
     if (!this.videoCardEl) return;
 
-    const hasVideo = !!match.videoUrl;
+    // Get current URLs
+    const urls = [];
+    if (match.videoUrls && Array.isArray(match.videoUrls)) {
+      urls.push(...match.videoUrls);
+    } else if (match.videoUrl) {
+      urls.push(match.videoUrl);
+    }
+    const cleanUrls = urls.filter(u => u.trim() !== '');
 
-    if (!hasVideo) {
-      // 비디오 주소가 없는 경우: 링크 등록 폼 노출
+    // Is in editing mode?
+    if (this.isEditingVideoUrls || cleanUrls.length === 0) {
+      // Render editor form with multiple inputs
+      const currentInputs = this.editingUrls || (cleanUrls.length > 0 ? [...cleanUrls] : ['']);
+      this.editingUrls = currentInputs; // keep reference in memory
+      
+      let inputRowsHtml = currentInputs.map((val, idx) => {
+        return `
+          <div class="video-url-input-row" style="display: flex; gap: 8px; margin-bottom: 8px; width: 100%;">
+            <input type="url" class="form-control match-video-url-input" value="${val}" placeholder="예: https://www.youtube.com/watch?v=..." style="flex: 1; font-size: 0.85rem; height: 38px;">
+            ${currentInputs.length > 1 ? `
+              <button class="btn btn-secondary btn-remove-url-row" data-index="${idx}" style="height: 38px; width: 38px; border-radius: 8px; color: var(--danger); padding: 0; display: flex; align-items: center; justify-content: center;" title="삭제">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+
       this.videoCardEl.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 14px;">
           <h3 style="font-size: 1.15rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-            <span>${match.opponent}전 경기 피드백 영상 등록</span>
+            <span>${match.opponent}전 경기 피드백 영상 등록/편집</span>
           </h3>
-          <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5;">
-            이 경기의 유튜브 경기 풀영상, 하이라이트 혹은 녹화본 분석 링크를 등록해주세요. 팀원들과 영상을 재생하며 의견을 나눌 수 있습니다.
+          <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 4px;">
+            이 경기의 유튜브 경기 풀영상, 하이라이트 혹은 녹화본 분석 링크를 등록해주세요. <strong>플러스(+) 버튼을 눌러 영상 링크를 여러 개 연동할 수 있습니다.</strong>
           </p>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <input type="url" id="match-video-url-input" class="form-control" placeholder="예: https://www.youtube.com/watch?v=..." style="flex: 1; min-width: 250px; font-size: 0.85rem; height: 38px;">
-            <button id="btn-save-match-video" class="btn btn-primary" style="height: 38px; font-weight: 700; min-width:110px;">
-              <i class="fa-solid fa-cloud-arrow-up"></i> 영상 링크 등록
+          <div id="video-url-inputs-container" style="width: 100%;">
+            ${inputRowsHtml}
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; align-items: center;">
+            <button id="btn-add-url-row" class="btn btn-secondary" style="height: 38px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-plus" style="color: var(--primary);"></i> 링크 추가
+            </button>
+            <div style="flex: 1;"></div>
+            ${cleanUrls.length > 0 ? `
+              <button id="btn-cancel-edit-video" class="btn btn-secondary" style="height: 38px; font-weight: 700;">
+                취소
+              </button>
+            ` : ''}
+            <button id="btn-save-match-videos" class="btn btn-primary" style="height: 38px; font-weight: 700; min-width: 110px;">
+              <i class="fa-solid fa-cloud-arrow-up"></i> 저장 완료
             </button>
           </div>
         </div>
       `;
 
-      // 링크 저장 클릭 바인딩
-      const saveBtn = document.getElementById('btn-save-match-video');
-      const urlInput = document.getElementById('match-video-url-input');
+      // Event listener for adding input row
+      document.getElementById('btn-add-url-row').addEventListener('click', () => {
+        // read current input values to preserve them
+        const inputs = document.querySelectorAll('.match-video-url-input');
+        const vals = Array.from(inputs).map(inp => inp.value.trim());
+        vals.push('');
+        this.editingUrls = vals;
+        this.renderVideoCard(match);
+      });
 
-      if (saveBtn && urlInput) {
-        saveBtn.addEventListener('click', async () => {
-          const url = urlInput.value.trim();
-          if (!url) {
-            alert('유튜브 동영상 링크를 입력해주세요.');
-            return;
-          }
-          await this.saveVideoUrl(match.id, url);
+      // Event listeners for removing row
+      const removeBtns = this.videoCardEl.querySelectorAll('.btn-remove-url-row');
+      removeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.index);
+          const inputs = document.querySelectorAll('.match-video-url-input');
+          const vals = Array.from(inputs).map(inp => inp.value.trim());
+          vals.splice(idx, 1);
+          this.editingUrls = vals;
+          this.renderVideoCard(match);
+        });
+      });
+
+      // Cancel button
+      const cancelBtn = document.getElementById('btn-cancel-edit-video');
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+          this.isEditingVideoUrls = false;
+          this.editingUrls = null;
+          this.renderVideoCard(match);
         });
       }
+
+      // Save button
+      document.getElementById('btn-save-match-videos').addEventListener('click', async () => {
+        const inputs = document.querySelectorAll('.match-video-url-input');
+        const vals = Array.from(inputs).map(inp => inp.value.trim()).filter(v => v !== '');
+        
+        if (vals.length === 0) {
+          alert('최소 하나의 유튜브 동영상 링크를 입력하거나, 취소해 주세요.');
+          return;
+        }
+
+        await this.saveVideoUrls(match.id, vals);
+        this.isEditingVideoUrls = false;
+        this.editingUrls = null;
+      });
+
     } else {
-      // 비디오 주소가 이미 등록된 경우: 유튜브 임베드 렌더링
-      const embedUrl = this.parseYoutubeEmbedUrl(match.videoUrl);
+      // Render players list stacked
+      let playersHtml = cleanUrls.map((url, index) => {
+        const embedUrl = this.parseYoutubeEmbedUrl(url);
+        return `
+          <div style="margin-bottom: 20px;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-circle-play" style="color: var(--primary);"></i> 분석 영상 #${index + 1}
+            </div>
+            ${embedUrl ? `
+              <div class="video-responsive" style="margin-bottom: 8px;">
+                <iframe src="${embedUrl}" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                        allowfullscreen></iframe>
+              </div>
+            ` : `
+              <div style="background: rgba(239,68,68,0.08); border:1px dashed rgba(239,68,68,0.2); padding:20px; border-radius:10px; color:#ef4444; font-size:0.85rem; text-align:center;">
+                <i class="fa-solid fa-triangle-exclamation" style="font-size:1.5rem; margin-bottom:8px;"></i><br>
+                유튜브 링크 주소 파싱 실패! 링크가 올바른 유튜브 주소인지 확인해주세요. (입력값: ${url})
+              </div>
+            `}
+          </div>
+        `;
+      }).join('');
 
       this.videoCardEl.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 16px;">
@@ -194,34 +286,22 @@ class MatchFeedbackManager {
               ⚽ ${match.opponent}전 분석 피드백
             </h3>
             <button id="btn-edit-match-video" class="btn btn-secondary" style="font-size: 0.75rem; padding: 6px 12px;" title="유튜브 영상 주소 변경">
-              <i class="fa-solid fa-pen-to-square"></i> 영상 링크 변경
+              <i class="fa-solid fa-pen-to-square"></i> 영상 링크 추가/변경
             </button>
           </div>
           
-          ${embedUrl ? `
-            <div class="video-responsive">
-              <iframe src="${embedUrl}" 
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-                      allowfullscreen></iframe>
-            </div>
-          ` : `
-            <div style="background: rgba(239,68,68,0.08); border:1px dashed rgba(239,68,68,0.2); padding:20px; border-radius:10px; color:#ef4444; font-size:0.85rem; text-align:center;">
-              <i class="fa-solid fa-triangle-exclamation" style="font-size:1.5rem; margin-bottom:8px;"></i><br>
-              유튜브 링크 주소 파싱 실패! 영상 링크를 올바른 유튜브 주소로 재생성해 주세요.
-            </div>
-          `}
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            ${playersHtml}
+          </div>
         </div>
       `;
 
-      // 영상 주소 변경 클릭 바인딩
-      const editBtn = document.getElementById('btn-edit-match-video');
-      if (editBtn) {
-        editBtn.addEventListener('click', () => {
-          // 비디오 주소를 빈 값으로 초기화하고 재렌더링
-          match.videoUrl = '';
-          this.renderVideoCard(match);
-        });
-      }
+      // Event listener for opening editor
+      document.getElementById('btn-edit-match-video').addEventListener('click', () => {
+        this.isEditingVideoUrls = true;
+        this.editingUrls = [...cleanUrls];
+        this.renderVideoCard(match);
+      });
     }
   }
 
@@ -254,15 +334,16 @@ class MatchFeedbackManager {
   }
 
   // 비디오 링크 DB 저장 진행
-  async saveVideoUrl(matchId, url) {
+  async saveVideoUrls(matchId, urls) {
     try {
-      await dbService.saveMatchVideoUrl(matchId, url);
-      alert('경기 분석 유튜브 영상이 정상적으로 연동되었습니다!');
+      await dbService.saveMatchVideoUrls(matchId, urls);
+      alert('경기 분석 유튜브 영상들이 정상적으로 연동되었습니다!');
       
       // 메모리 즉시 반영 및 디테일 새로 로드
       const match = this.matches.find(m => m.id === matchId);
       if (match) {
-        match.videoUrl = url;
+        match.videoUrls = urls;
+        match.videoUrl = urls[0] || '';
         this.renderVideoCard(match);
         this.renderMatchesList();
       }
