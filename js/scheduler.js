@@ -217,7 +217,7 @@ class SchedulerService {
             <button class="btn-delete-schedule" title="경기 일정 삭제" style="background: none; border: none; color: var(--text-muted); cursor: pointer; transition: color 0.2s; padding: 4px;"><i class="fa-solid fa-xmark"></i></button>
           </div>
           
-          <div class="match-header">
+          <div class="match-header" style="padding-right: 55px;">
             <span class="match-date-badge">${s.date.replace(/-/g, '/')} (${dayName})</span>
             <span style="font-size:0.85rem; font-weight:700; color:var(--accent);"><i class="fa-regular fa-clock"></i> ${s.time}</span>
           </div>
