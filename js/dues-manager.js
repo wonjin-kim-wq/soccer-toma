@@ -11,7 +11,7 @@ class DuesManager {
     this.players = [];
     this.duesData = {}; // 현재 선택된 연도의 회비 데이터: { playerId: { 1: bool, 2: bool, ... } }
     this.selectedYear = '2026';
-    this.monthlyFee = 20000; // 월 회비 기준: 2만 원
+    this.monthlyFee = 10000; // 월 회비 기준: 1만 원 (수정됨)
   }
 
   // 초기화 및 리스너 등록
@@ -82,6 +82,13 @@ class DuesManager {
         if (playerDues[m]) paidCount++;
       }
       const playerDuesRate = Math.round((paidCount / 12) * 100);
+      const isAllPaid = playerDuesRate === 100;
+
+      // 연회비 납부 버튼 디자인 및 텍스트 동적 결정
+      const annualBtnText = isAllPaid ? '연회비 취소' : '연회비 납부';
+      const annualBtnStyle = isAllPaid
+        ? 'background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444;'
+        : 'background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: var(--primary);';
 
       // 1월부터 12월까지의 O/X 버튼 생성
       let monthsHtml = '';
@@ -100,8 +107,13 @@ class DuesManager {
 
       return `
         <tr data-player-id="${p.id}">
-          <td style="padding-left: 20px; font-weight: 700; color: var(--text-primary);">
-            ${p.name} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:500;">#${p.backNumber}</span>
+          <td style="padding: 12px 10px 12px 20px; font-weight: 700; color: var(--text-primary);">
+            <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start;">
+              <span>${p.name} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:500;">#${p.backNumber}</span></span>
+              <button class="annual-pay-btn" data-player-id="${p.id}" style="padding: 2px 6px; font-size: 0.65rem; font-weight:600; border-radius: 4px; ${annualBtnStyle} cursor: pointer; transition: all 0.2s;">
+                ${annualBtnText}
+              </button>
+            </div>
           </td>
           ${monthsHtml}
           <!-- 개인 연간 납부율 -->
@@ -140,8 +152,37 @@ class DuesManager {
         // 4. 재정 정보 및 통계 재연산
         this.calculateFinanceStats();
         
-        // 개인 행 납부율 갱신을 위해 통으로 다시 안 그리고 해당 행만 갱신하거나 전체 리프레시
-        // 통계 연산 속도가 빠르므로 매끄럽게 재렌더링
+        // 개인 행 납부율 및 연회비 납부 상태 갱신을 위해 리로드
+        this.loadDues();
+      });
+    });
+
+    // 연회비 납부/취소 일괄 버튼 클릭 이벤트 리스너 바인딩
+    this.tableBody.querySelectorAll('.annual-pay-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const button = e.target.closest('.annual-pay-btn');
+        const playerId = button.dataset.playerId;
+        
+        // 이 선수의 현재 수납 상태 계산
+        const playerDues = this.duesData[playerId] || {};
+        let paidCount = 0;
+        for (let m = 1; m <= 12; m++) {
+          if (playerDues[m]) paidCount++;
+        }
+        
+        // 이미 12달 완납 상태이면 '일괄 미납(false)'으로 취소, 아니면 '일괄 완납(true)' 처리
+        const targetState = paidCount !== 12;
+
+        if (!this.duesData[playerId]) this.duesData[playerId] = {};
+        
+        // 12달 전부 상태 업데이트 및 Firestore 동기화
+        for (let m = 1; m <= 12; m++) {
+          this.duesData[playerId][m] = targetState;
+          await dbService.saveDues(this.selectedYear, playerId, m, targetState);
+        }
+
+        // 상태 갱신 및 재렌더링
+        this.calculateFinanceStats();
         this.loadDues();
       });
     });
