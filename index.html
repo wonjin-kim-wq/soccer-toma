@@ -60,6 +60,12 @@
             <span>개인 피드백</span>
           </a>
         </li>
+        <li>
+          <a class="menu-item" data-target="view-match-feedback">
+            <i class="fa-solid fa-video"></i>
+            <span>경기 피드백</span>
+          </a>
+        </li>
       </ul>
       
       <div class="sidebar-footer">
@@ -111,6 +117,49 @@
             <button id="btn-dday-go-schedule" class="btn btn-secondary" style="font-size: 0.8rem; padding: 8px 16px;">
               <i class="fa-solid fa-calendar-days" style="margin-right: 6px;"></i> 일정 상세히 보기
             </button>
+          </div>
+        </div>
+
+        <!-- BEST & WORST MATCH VOTING WIDGET [NEW] -->
+        <div id="dashboard-voting-container" class="card" style="display: none; margin-bottom: 24px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.08) 100%); border-color: rgba(59, 130, 246, 0.2); padding: 24px;">
+          <h3 class="card-title" style="margin-bottom: 8px;"><i class="fa-solid fa-square-poll-vertical" style="color: var(--info);"></i> 베스트 & 워스트 선수 투표</h3>
+          <p id="voting-match-title" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">최근 경기: [상대팀] 매치 투표가 진행 중입니다.</p>
+          
+          <!-- Voting Form (Hidden if already voted) -->
+          <form id="dashboard-voting-form" style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
+            <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 200px;">
+              <label for="vote-best-select" style="font-size: 0.75rem; font-weight: 700; color: var(--primary);">⭐ 베스트 선수 (MOM)</label>
+              <select id="vote-best-select" class="form-control" style="background-color: rgba(22, 28, 45, 0.9);" required>
+                <!-- JS Dynamic Option elements -->
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 200px;">
+              <label for="vote-worst-select" style="font-size: 0.75rem; font-weight: 700; color: var(--danger);">⚠️ 워스트 선수</label>
+              <select id="vote-worst-select" class="form-control" style="background-color: rgba(22, 28, 45, 0.9);" required>
+                <!-- JS Dynamic Option elements -->
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary" style="height: 42px; font-weight: 700; min-width: 120px;">
+              <i class="fa-solid fa-vote-yea" style="margin-right: 6px;"></i> 투표 제출
+            </button>
+          </form>
+          
+          <!-- Voting Results (Shown if already voted) -->
+          <div id="dashboard-voting-results" style="display: none; flex-direction: column; gap: 14px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+              <div>
+                <h4 style="font-size: 0.8rem; color: var(--primary); font-weight: 800; margin-bottom: 8px;">⭐ 베스트 선수 실시간 득표율</h4>
+                <div id="vote-best-results-list" style="display: flex; flex-direction: column; gap: 8px;">
+                  <!-- JS Dynamic Progress bars -->
+                </div>
+              </div>
+              <div>
+                <h4 style="font-size: 0.8rem; color: var(--danger); font-weight: 800; margin-bottom: 8px;">⚠️ 워스트 선수 실시간 득표율</h4>
+                <div id="vote-worst-results-list" style="display: flex; flex-direction: column; gap: 8px;">
+                  <!-- JS Dynamic Progress bars -->
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -567,6 +616,64 @@
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%; height: 42px; font-size: 0.9rem; font-weight: 700;">
                   <i class="fa-solid fa-paper-plane" style="margin-right: 6px;"></i> 피드백 등록하기
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 7: Match Feedback & Video Timeline [NEW] -->
+      <section id="view-match-feedback" class="content-view">
+        <div class="feedback-layout">
+          <!-- Left: Past Matches List Panel -->
+          <div class="card feedback-player-sidebar">
+            <h3 class="card-title" style="margin-bottom: 16px;">
+              <i class="fa-solid fa-calendar-check" style="color: var(--primary);"></i> 과거 경기 목록
+            </h3>
+            <div id="match-feedback-list" class="feedback-player-list-container">
+              <!-- JS Dynamic Match Cards -->
+            </div>
+          </div>
+
+          <!-- Right: Video Player & Comments Panel -->
+          <div class="feedback-main-panel">
+            <!-- Selected Match Header / Video Player Card -->
+            <div id="match-video-card" class="card" style="padding: 24px;">
+              <!-- JS Dynamic Video Iframe or Input Form -->
+              <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                <i class="fa-solid fa-circle-play" style="font-size: 2.5rem; margin-bottom: 12px; opacity: 0.5;"></i>
+                <p>왼쪽 목록에서 경기를 선택하시면 경기 피드백이 로드됩니다.</p>
+              </div>
+            </div>
+
+            <!-- Comment Section Container -->
+            <div id="match-comments-card" class="card feedback-comments-box" style="display: none;">
+              <h3 class="card-title" style="margin-bottom: 20px;">
+                <i class="fa-solid fa-comments" style="color: var(--accent);"></i> 경기 분석 토론장
+              </h3>
+              
+              <!-- Timeline Scrollable -->
+              <div id="match-feedback-timeline" class="feedback-timeline-container">
+                <!-- JS Dynamic comments -->
+              </div>
+
+              <!-- Write Form -->
+              <form id="match-feedback-comment-form" class="feedback-form-box" style="border-top: 1px solid var(--border-color); padding-top: 20px; margin-top: 16px;">
+                <div class="form-row" style="margin-bottom: 12px;">
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label for="match-feedback-writer" style="font-size: 0.8rem;">작성자 닉네임 (미기재 시 익명)</label>
+                    <input type="text" id="match-feedback-writer" class="form-control" placeholder="예: 적토마팬 (익명)" style="height: 38px; font-size: 0.85rem;">
+                  </div>
+                  <div style="display: flex; align-items: flex-end; justify-content: flex-end;">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="match-feedback-content" style="font-size: 0.8rem;">분석 의견 작성</label>
+                  <textarea id="match-feedback-content" class="form-control" rows="3" placeholder="경기를 보고 전술적 의견이나 응원의 코멘트를 자유롭게 달아주세요..." required style="resize: none; background-color: rgba(22, 28, 45, 0.9); font-size: 0.85rem; padding: 10px 12px;"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; height: 42px; font-size: 0.9rem; font-weight: 700;">
+                  <i class="fa-solid fa-comment-dots" style="margin-right: 6px;"></i> 의견 남기기
                 </button>
               </form>
             </div>

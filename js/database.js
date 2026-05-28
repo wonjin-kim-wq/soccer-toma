@@ -8,7 +8,9 @@ const STORAGE_KEYS = {
   SCHEDULES: 'jeoktoma_schedules',
   FIREBASE_CONFIG: 'jeoktoma_firebase_config',
   GSHEET_URL: 'jeoktoma_gsheet_url',
-  FEEDBACK: 'jeoktoma_feedback'
+  FEEDBACK: 'jeoktoma_feedback',
+  MATCH_FEEDBACK: 'jeoktoma_match_feedback',
+  VOTES: 'jeoktoma_votes'
 };
 
 // 기본 내장 Firebase 설정 (모든 사용자가 설정을 입력하지 않고 즉시 동일한 DB를 연동 및 공유할 수 있도록 지원)
@@ -492,6 +494,18 @@ class DatabaseService {
         await setDoc(doc(this.firestore, "feedback", playerId), { comments: localFeedback[playerId] });
       }
 
+      // 7. 경기 피드백 댓글 업로드 [NEW]
+      const localMatchFeedback = this.getLocalData(STORAGE_KEYS.MATCH_FEEDBACK) || {};
+      for (const matchId in localMatchFeedback) {
+        await setDoc(doc(this.firestore, "match_feedback", matchId), { comments: localMatchFeedback[matchId] });
+      }
+
+      // 8. 투표 데이터 업로드 [NEW]
+      const localVotes = this.getLocalData(STORAGE_KEYS.VOTES) || {};
+      for (const matchId in localVotes) {
+        await setDoc(doc(this.firestore, "votes", matchId), localVotes[matchId]);
+      }
+
       console.log("모든 로컬 데이터가 Firebase에 업로드 동기화되었습니다!");
     } catch (e) {
       console.error("로컬 -> Firebase 동기화 진행 중 오류 발생:", e);
@@ -570,6 +584,112 @@ class DatabaseService {
       }
     }
     return comment;
+  }
+
+  // 8. 경기 피드백 유튜브 연동 및 토론장 코멘트 관리 [NEW]
+  async getMatchFeedback(matchId) {
+    if (this.isConnected) {
+      try {
+        const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const docRef = doc(this.firestore, "match_feedback", matchId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const fbData = docSnap.data();
+          const allFb = this.getLocalData(STORAGE_KEYS.MATCH_FEEDBACK) || {};
+          allFb[matchId] = fbData.comments || [];
+          this.saveLocalData(STORAGE_KEYS.MATCH_FEEDBACK, allFb);
+          return fbData.comments || [];
+        }
+      } catch (error) {
+        console.warn("Firestore에서 경기 피드백 데이터를 불러오지 못했습니다.", error);
+      }
+    }
+    const allFb = this.getLocalData(STORAGE_KEYS.MATCH_FEEDBACK) || {};
+    return allFb[matchId] || [];
+  }
+
+  async saveMatchFeedbackComment(matchId, comment) {
+    const allFb = this.getLocalData(STORAGE_KEYS.MATCH_FEEDBACK) || {};
+    if (!allFb[matchId]) allFb[matchId] = [];
+    
+    allFb[matchId].push(comment);
+    this.saveLocalData(STORAGE_KEYS.MATCH_FEEDBACK, allFb);
+
+    if (this.isConnected) {
+      try {
+        const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        await setDoc(doc(this.firestore, "match_feedback", matchId), { comments: allFb[matchId] });
+      } catch (error) {
+        console.error("Firestore에 경기 피드백 코멘트 저장 실패:", error);
+      }
+    }
+    return comment;
+  }
+
+  async saveMatchVideoUrl(matchId, url) {
+    const schedules = await this.getSchedules();
+    const match = schedules.find(s => s.id === matchId);
+    if (match) {
+      match.videoUrl = url;
+      this.saveLocalData(STORAGE_KEYS.SCHEDULES, schedules);
+      
+      if (this.isConnected) {
+        try {
+          const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+          const { id, ...scheduleData } = match;
+          await setDoc(doc(this.firestore, "schedules", id), scheduleData);
+        } catch (error) {
+          console.error("Firestore에 경기 영상 링크 저장 실패:", error);
+        }
+      }
+    }
+    return url;
+  }
+
+  // 9. 대시보드 베스트 & 워스트 투표 관리 [NEW]
+  async getVotes(matchId) {
+    if (this.isConnected) {
+      try {
+        const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const docRef = doc(this.firestore, "votes", matchId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const votesData = docSnap.data();
+          const allVotes = this.getLocalData(STORAGE_KEYS.VOTES) || {};
+          allVotes[matchId] = votesData;
+          this.saveLocalData(STORAGE_KEYS.VOTES, allVotes);
+          return votesData;
+        }
+      } catch (error) {
+        console.warn("Firestore에서 투표 데이터를 불러오지 못했습니다.", error);
+      }
+    }
+    const allVotes = this.getLocalData(STORAGE_KEYS.VOTES) || {};
+    return allVotes[matchId] || { matchId, best: {}, worst: {} };
+  }
+
+  async submitVote(matchId, bestPlayerId, worstPlayerId) {
+    const votes = await this.getVotes(matchId);
+    
+    if (!votes.best) votes.best = {};
+    if (!votes.worst) votes.worst = {};
+    
+    votes.best[bestPlayerId] = (votes.best[bestPlayerId] || 0) + 1;
+    votes.worst[worstPlayerId] = (votes.worst[worstPlayerId] || 0) + 1;
+    
+    const allVotes = this.getLocalData(STORAGE_KEYS.VOTES) || {};
+    allVotes[matchId] = votes;
+    this.saveLocalData(STORAGE_KEYS.VOTES, allVotes);
+
+    if (this.isConnected) {
+      try {
+        const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        await setDoc(doc(this.firestore, "votes", matchId), votes);
+      } catch (error) {
+        console.error("Firestore에 투표 데이터 저장 실패:", error);
+      }
+    }
+    return votes;
   }
 }
 

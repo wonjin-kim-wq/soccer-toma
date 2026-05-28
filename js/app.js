@@ -7,6 +7,7 @@ import { duesManager } from './dues-manager.js';
 import { tacticalBoard } from './tactical-board.js';
 import { schedulerService } from './scheduler.js'; // [NEW] 경기 일정 관리자
 import { feedbackManager } from './feedback-manager.js'; // [NEW] 개인 피드백 관리자
+import { matchFeedbackManager } from './match-feedback.js'; // [NEW] 경기 피드백 관리자
 
 class AppController {
   constructor() {
@@ -26,16 +27,20 @@ class AppController {
     playerRecords.init(async (playersList) => {
       await duesManager.updatePlayersList(playersList);
       await feedbackManager.updatePlayersList(playersList);
+      this.updateVotingPlayersList(playersList); // [NEW] 투표용 선수 목록 동적 반영
     });
     
     duesManager.init();
     tacticalBoard.init();
     feedbackManager.init();
+    matchFeedbackManager.init(); // [NEW] 경기 피드백 매니저 초기화
     
     // [NEW] 경기 일정 서비스 모듈 구동
-    // 일정이 추가되거나 변경되면 -> 대시보드 상단 D-Day 위젯 카드 갱신
+    // 일정이 추가되거나 변경되면 -> 대시보드 상단 D-Day 및 투표 위젯 갱신
     await schedulerService.init((schedules) => {
       this.updateDashboardDday(schedules);
+      this.checkDashboardVoting(schedules); // [NEW] 베스트/워스트 투표 가용성 체크
+      matchFeedbackManager.updateSchedulesList(schedules); // [NEW] 피드백 경기 리스트 갱신
     });
 
     // 3. 글로벌 UI 이벤트 바인딩
@@ -104,6 +109,10 @@ class AppController {
 
         if (targetViewId === 'view-schedule') {
           schedulerService.render();
+        }
+
+        if (targetViewId === 'view-match-feedback') {
+          schedulerService.loadSchedules();
         }
       });
     });
@@ -301,6 +310,184 @@ class AppController {
         document.getElementById('modal-tactic-save').classList.remove('active');
       });
     }
+  }
+
+  // [NEW] 대시보드 베스트 & 워스트 투표 1주일간 노출 체크 모듈
+  async checkDashboardVoting(schedules) {
+    const votingContainer = document.getElementById('dashboard-voting-container');
+    const votingTitle = document.getElementById('voting-match-title');
+    const votingForm = document.getElementById('dashboard-voting-form');
+    const votingResults = document.getElementById('dashboard-voting-results');
+
+    if (!votingContainer || !votingTitle || !votingForm || !votingResults) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const today = new Date(todayStr + 'T00:00:00');
+
+    // 최근 치른 경기 중 오늘 기준 일주일(7일) 이내 경기 찾기 (date <= 오늘 && date >= 오늘 - 7일)
+    const pastMatches = schedules.filter(s => {
+      if (s.date > todayStr) return false;
+      const matchDate = new Date(s.date + 'T00:00:00');
+      const diffTime = today - matchDate;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays <= 7;
+    });
+
+    if (pastMatches.length === 0) {
+      votingContainer.style.display = 'none';
+      return;
+    }
+
+    // 가장 최근의 과거 경기 1개 타겟 지정
+    pastMatches.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const targetMatch = pastMatches[0];
+
+    votingContainer.style.display = 'block';
+    
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    const dayName = days[new Date(targetMatch.date).getDay()];
+    votingTitle.innerHTML = `⭐ <strong>${targetMatch.date.replace(/-/g, '/')} (${dayName}) 상대: ${targetMatch.opponent}</strong> 경기 베스트/워스트 투표가 진행 중입니다! (경기 후 7일간 활성)`;
+
+    // 이미 투표했는지 여부 판단 (LocalStorage에 jeoktoma_voted_MATCHID 키 검사)
+    const hasVoted = localStorage.getItem(`jeoktoma_voted_${targetMatch.id}`);
+    
+    if (hasVoted) {
+      votingForm.style.display = 'none';
+      votingResults.style.display = 'flex';
+      await this.renderVotingResults(targetMatch.id);
+    } else {
+      votingForm.style.display = 'flex';
+      votingResults.style.display = 'none';
+      this.setupVotingFormSubmit(targetMatch.id);
+    }
+  }
+
+  // 투표 폼 제출 설정
+  setupVotingFormSubmit(matchId) {
+    const votingForm = document.getElementById('dashboard-voting-form');
+    const votingResults = document.getElementById('dashboard-voting-results');
+
+    if (!votingForm) return;
+
+    if (votingForm.dataset.listenerBound === 'true') return;
+    votingForm.dataset.listenerBound = 'true';
+
+    votingForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const bestSelect = document.getElementById('vote-best-select');
+      const worstSelect = document.getElementById('vote-worst-select');
+
+      if (!bestSelect || !worstSelect) return;
+
+      const bestId = bestSelect.value;
+      const worstId = worstSelect.value;
+
+      if (!bestId || !worstId) {
+        alert('베스트와 워스트 선수를 모두 선택해 주세요.');
+        return;
+      }
+
+      if (bestId === worstId) {
+        alert('베스트 선수와 워스트 선수는 동일인으로 선택할 수 없습니다.');
+        return;
+      }
+
+      try {
+        await dbService.submitVote(matchId, bestId, worstId);
+        
+        // 투표 로컬 플래그 마킹
+        localStorage.setItem(`jeoktoma_voted_${matchId}`, 'true');
+        
+        alert('투표가 소중하게 반영되었습니다! 실시간 결과를 확인해보세요.');
+        
+        // UI 변경 및 결과 렌더링
+        votingForm.style.display = 'none';
+        votingResults.style.display = 'flex';
+        await this.renderVotingResults(matchId);
+
+      } catch (err) {
+        console.error(err);
+        alert('투표 반영 중 오류가 발생했습니다: ' + err.message);
+      }
+    });
+  }
+
+  // 투표용 선수 드롭다운 셀렉트 채우기
+  updateVotingPlayersList(playersList) {
+    this.cachedPlayers = playersList;
+    const bestSelect = document.getElementById('vote-best-select');
+    const worstSelect = document.getElementById('vote-worst-select');
+
+    if (!bestSelect || !worstSelect) return;
+
+    const placeholder = '<option value="" disabled selected>선수 선택...</option>';
+    const optionsHtml = playersList.map(p => {
+      return `<option value="${p.id}">${p.name} (#${p.backNumber} - ${p.position})</option>`;
+    }).join('');
+
+    bestSelect.innerHTML = placeholder + optionsHtml;
+    worstSelect.innerHTML = placeholder + optionsHtml;
+  }
+
+  // 실시간 투표 득표율 시각화 렌더링 (퍼센트 그라데이션 바)
+  async renderVotingResults(matchId) {
+    const bestResultsList = document.getElementById('vote-best-results-list');
+    const worstResultsList = document.getElementById('vote-worst-results-list');
+
+    if (!bestResultsList || !worstResultsList || !this.cachedPlayers) return;
+
+    const votesData = await dbService.getVotes(matchId);
+    const bestVotes = votesData.best || {};
+    const worstVotes = votesData.worst || {};
+
+    let totalBestCount = 0;
+    let totalWorstCount = 0;
+
+    for (const pid in bestVotes) totalBestCount += (bestVotes[pid] || 0);
+    for (const pid in worstVotes) totalWorstCount += (worstVotes[pid] || 0);
+
+    const bestRank = this.cachedPlayers.map(p => {
+      const count = bestVotes[p.id] || 0;
+      const rate = totalBestCount > 0 ? Math.round((count / totalBestCount) * 100) : 0;
+      return { player: p, count, rate };
+    }).sort((a, b) => b.count - a.count).slice(0, 3);
+
+    const worstRank = this.cachedPlayers.map(p => {
+      const count = worstVotes[p.id] || 0;
+      const rate = totalWorstCount > 0 ? Math.round((count / totalWorstCount) * 100) : 0;
+      return { player: p, count, rate };
+    }).sort((a, b) => b.count - a.count).slice(0, 3);
+
+    bestResultsList.innerHTML = bestRank.map((item, index) => {
+      const rankBadge = index === 0 ? '👑 MOM' : `${index + 1}위`;
+      return `
+        <div class="vote-progress-wrapper">
+          <div class="vote-progress-header">
+            <span style="font-weight: 800; color: #fff;">${rankBadge} ${item.player.name} <span style="font-size:0.7rem; color:var(--text-muted); font-weight:500;">#${item.player.backNumber}</span></span>
+            <span style="color: var(--primary); font-weight: 800;">${item.rate}% (${item.count}표)</span>
+          </div>
+          <div class="vote-progress-bar-bg">
+            <div class="vote-progress-bar-fill best" style="width: ${item.rate}%;"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    worstResultsList.innerHTML = worstRank.map((item, index) => {
+      const rankBadge = `${index + 1}위`;
+      return `
+        <div class="vote-progress-wrapper">
+          <div class="vote-progress-header">
+            <span style="font-weight: 800; color: #fff;">${rankBadge} ${item.player.name} <span style="font-size:0.7rem; color:var(--text-muted); font-weight:500;">#${item.player.backNumber}</span></span>
+            <span style="color: var(--danger); font-weight: 800;">${item.rate}% (${item.count}표)</span>
+          </div>
+          <div class="vote-progress-bar-bg">
+            <div class="vote-progress-bar-fill worst" style="width: ${item.rate}%;"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 }
 

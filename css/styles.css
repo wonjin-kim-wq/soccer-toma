@@ -1515,4 +1515,76 @@ button, input, select, textarea {
   }
 }
 
+/* ========================================== */
+/* 경기 피드백 유튜브 임베드 및 투표 스타일 추가 */
+/* ========================================== */
+
+/* 유튜브 반응형 16:9 컨테이너 */
+.video-responsive {
+  overflow: hidden;
+  padding-bottom: 56.25%; /* 16:9 */
+  position: relative;
+  height: 0;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  background-color: #000;
+}
+
+.video-responsive iframe {
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  border: 0;
+}
+
+/* 투표 실시간 결과 프로그레스 바 */
+.vote-progress-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  background-color: rgba(255, 255, 255, 0.01);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.vote-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.vote-progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.vote-progress-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  width: 0; /* JS Animation */
+  transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vote-progress-bar-fill.best {
+  background: linear-gradient(90deg, var(--primary) 0%, #3B82F6 100%);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.vote-progress-bar-fill.worst {
+  background: linear-gradient(90deg, var(--danger) 0%, #F87171 100%);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+
 
