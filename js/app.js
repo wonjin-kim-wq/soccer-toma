@@ -5,6 +5,7 @@ import { dbService } from './database.js';
 import { playerRecords } from './player-records.js';
 import { duesManager } from './dues-manager.js';
 import { tacticalBoard } from './tactical-board.js';
+import { schedulerService } from './scheduler.js'; // [NEW] 경기 일정 관리자
 
 class AppController {
   constructor() {
@@ -27,12 +28,19 @@ class AppController {
     
     duesManager.init();
     tacticalBoard.init();
+    
+    // [NEW] 경기 일정 서비스 모듈 구동
+    // 일정이 추가되거나 변경되면 -> 대시보드 상단 D-Day 위젯 카드 갱신
+    await schedulerService.init((schedules) => {
+      this.updateDashboardDday(schedules);
+    });
 
     // 3. 글로벌 UI 이벤트 바인딩
     this.setupViewNavigation();
     this.setupModalEvents();
     this.setupFirebaseConfigEvents();
     this.setupTacticalPanelEvents();
+    this.setupDdayShortcutEvents(); // [NEW] 바로가기 바인딩
 
     console.log('적토마 FC 시스템 준비 완료!');
   }
@@ -88,14 +96,87 @@ class AppController {
         if (targetViewId === 'view-dashboard') {
           playerRecords.updateDashboardStats();
           tacticalBoard.loadSavedTacticsList();
+          schedulerService.loadSchedules(); // 일정 최신화 유도
+        }
+
+        if (targetViewId === 'view-schedule') {
+          schedulerService.render();
         }
       });
     });
   }
 
+  // [NEW] 대시보드 다음 경기 D-Day 실시간 카드 연산 모듈
+  updateDashboardDday(schedules) {
+    const ddayBadge = document.getElementById('dday-badge');
+    const ddayOpponent = document.getElementById('dday-opponent');
+    const ddayDatetime = document.getElementById('dday-datetime');
+    const ddayLocation = document.getElementById('dday-location');
+
+    if (!ddayBadge || !ddayOpponent || !ddayDatetime || !ddayLocation) return;
+
+    // 오늘 날짜 포맷팅 (시, 분, 초 제거하여 순수 날짜 기준 계산)
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    // 오늘 포함 미래의 경기 일정 필터링
+    const upcoming = schedules.filter(s => s.date >= todayStr);
+
+    if (upcoming.length === 0) {
+      // 1) 경기 일정이 전혀 없을 경우 플레이스홀더 출력
+      ddayBadge.textContent = '대기';
+      ddayBadge.style.background = 'linear-gradient(135deg, var(--text-muted) 0%, #334155 100%)';
+      ddayBadge.style.boxShadow = 'none';
+      ddayOpponent.textContent = '예정된 경기 일정이 없습니다.';
+      ddayDatetime.textContent = '일정 관리 탭으로 이동해서 새 경기를 추가해보세요!';
+      ddayLocation.textContent = '미정';
+      return;
+    }
+
+    // 시간순으로 정렬되었으므로, 가장 첫 인덱스가 가장 가까운 경기
+    const nextMatch = upcoming[0];
+
+    // D-Day 연산
+    const todayDate = new Date(todayStr + 'T00:00:00');
+    const matchDate = new Date(nextMatch.date + 'T00:00:00');
+    const diffTime = matchDate - todayDate;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // 요일 구하기
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    const dayName = days[new Date(nextMatch.date).getDay()];
+
+    // 배지 텍스트 렌더링
+    if (diffDays === 0) {
+      ddayBadge.textContent = 'D-DAY';
+      ddayBadge.style.background = 'linear-gradient(135deg, var(--danger) 0%, #DC2626 100%)';
+      ddayBadge.style.boxShadow = '0 4px 15px rgba(239, 68, 68, 0.4)';
+    } else {
+      ddayBadge.textContent = `D-${diffDays}`;
+      ddayBadge.style.background = 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)';
+      ddayBadge.style.boxShadow = '0 4px 15px rgba(245, 158, 11, 0.3)';
+    }
+
+    // 상대 팀 정보
+    ddayOpponent.textContent = `상대: ${nextMatch.opponent}`;
+    ddayDatetime.textContent = `${nextMatch.date.replace(/-/g, '년 ')}일 (${dayName}) ${nextMatch.time}`;
+    ddayLocation.textContent = nextMatch.location;
+  }
+
+  // [NEW] 대시보드 D-Day 카드 내부 바로가기 버튼 바인딩
+  setupDdayShortcutEvents() {
+    const btnGo = document.getElementById('btn-dday-go-schedule');
+    if (btnGo) {
+      btnGo.addEventListener('click', () => {
+        const scheduleTabMenu = document.querySelector('.menu-item[data-target="view-schedule"]');
+        if (scheduleTabMenu) {
+          scheduleTabMenu.click();
+        }
+      });
+    }
+  }
+
   // 공통 모달 열기/닫기 이벤트 바인딩
   setupModalEvents() {
-    // 닫기 트리거 등록
     const closeBtns = document.querySelectorAll('[data-close]');
     closeBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -105,7 +186,6 @@ class AppController {
       });
     });
 
-    // 외부 바인딩 모달 배경 클릭 시 닫기
     const modals = document.querySelectorAll('.modal-overlay');
     modals.forEach(modal => {
       modal.addEventListener('click', (e) => {
@@ -115,7 +195,6 @@ class AppController {
       });
     });
 
-    // 설정 모달 열기 버튼 바인딩
     const btnOpenSettings = document.getElementById('btn-open-settings');
     if (btnOpenSettings) {
       btnOpenSettings.addEventListener('click', () => {
@@ -166,9 +245,8 @@ class AppController {
           
           alert('Firebase가 성공적으로 연동되었으며 기존 로컬 데이터가 동기화되었습니다!');
           
-          // 모달 닫고 시스템 리로드
           document.getElementById('modal-settings').classList.remove('active');
-          location.reload(); // 리로딩하여 모든 모듈 최신 커넥션 기준으로 재수립
+          location.reload();
         } catch (error) {
           alert('Firebase 연동 실패! 입력한 세부 정보를 다시 확인해주세요.\n오류: ' + error.message);
         }
@@ -202,7 +280,6 @@ class AppController {
       });
     }
 
-    // 전술 패턴 저장 모달 오픈
     if (btnOpenSaveTactic) {
       btnOpenSaveTactic.addEventListener('click', () => {
         document.getElementById('tactic-name').value = '';
@@ -210,7 +287,6 @@ class AppController {
       });
     }
 
-    // 전술 패턴 제출 완료
     if (formSaveTactic) {
       formSaveTactic.addEventListener('submit', async (e) => {
         e.preventDefault();

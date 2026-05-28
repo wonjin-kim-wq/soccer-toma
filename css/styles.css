@@ -1087,3 +1087,142 @@ button, input, select, textarea {
     max-width: 100%;
   }
 }
+
+/* ========================================== */
+/* 경기 일정 (Calendar & Schedules) 스타일 추가 */
+/* ========================================== */
+
+/* 달력 날짜 셀 */
+.calendar-day-cell {
+  background-color: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.calendar-day-cell:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.calendar-day-cell.today {
+  border-color: var(--primary);
+  background-color: rgba(16, 185, 129, 0.04);
+}
+
+.calendar-day-cell.other-month {
+  opacity: 0.25;
+}
+
+.calendar-day-num {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.calendar-day-cell.sunday .calendar-day-num {
+  color: #EF4444; /* 일요일은 빨간색 */
+}
+
+.calendar-day-cell.saturday .calendar-day-num {
+  color: #3B82F6; /* 토요일은 파란색 */
+}
+
+.calendar-day-cell.today .calendar-day-num {
+  color: var(--primary);
+}
+
+/* 달력 일정 배지 */
+.calendar-match-badge {
+  background-color: rgba(16, 185, 129, 0.15);
+  border-left: 3px solid var(--primary);
+  color: #F8FAFC;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: auto;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.15);
+}
+
+/* 예정 매치 일정 리스트 아이템 */
+.match-schedule-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.match-schedule-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.match-schedule-card .match-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.match-schedule-card .match-date-badge {
+  background: var(--primary-light);
+  color: var(--primary);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.match-schedule-card .match-opponent {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.match-schedule-card .match-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.match-schedule-card .btn-delete-schedule {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 4px;
+}
+
+.match-schedule-card .btn-delete-schedule:hover {
+  color: var(--danger);
+}
+
+/* ========================================== */
+/* 전술판 애니메이션 (Tactical Animation) 추가 */
+/* ========================================== */
+
+/* 애니메이션 동작 시 선수들의 움직임 효과 */
+.pitch-player.animating {
+  transition: left 0.8s cubic-bezier(0.4, 0, 0.2, 1), top 0.8s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}

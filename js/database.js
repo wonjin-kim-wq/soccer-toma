@@ -5,10 +5,11 @@ const STORAGE_KEYS = {
   PLAYERS: 'jeoktoma_players',
   DUES: 'jeoktoma_dues',
   TACTICS: 'jeoktoma_tactics',
+  SCHEDULES: 'jeoktoma_schedules',
   FIREBASE_CONFIG: 'jeoktoma_firebase_config'
 };
 
-// 기본 샘플 데이터 (앱 최초 실행 시 시각적 완성도를 높이기 위해 제공)
+// 기본 샘플 데이터 (선수단)
 const DEFAULT_PLAYERS = [
   { id: 'p1', name: '손흥민', backNumber: '7', position: 'FW', goals: 12, assists: 6, matches: 15 },
   { id: 'p2', name: '이강인', backNumber: '10', position: 'MF', goals: 5, assists: 9, matches: 14 },
@@ -18,6 +19,7 @@ const DEFAULT_PLAYERS = [
   { id: 'p6', name: '조현우', backNumber: '21', position: 'GK', goals: 0, assists: 0, matches: 15 }
 ];
 
+// 기본 샘플 데이터 (회비)
 const DEFAULT_DUES = {
   '2026': {
     'p1': { 1: true, 2: true, 3: true, 4: true, 5: true, 6: false, 7: false, 8: false, 9: false, 10: false, 11: false, 12: false },
@@ -28,6 +30,34 @@ const DEFAULT_DUES = {
     'p6': { 1: true, 2: true, 3: true, 4: true, 5: true, 6: false, 7: false, 8: false, 9: false, 10: false, 11: false, 12: false }
   }
 };
+
+// 기본 샘플 데이터 (경기 일정 - 2026년 5월 28일 기준 근접한 매치들로 시뮬레이션)
+const DEFAULT_SCHEDULES = [
+  {
+    id: 'sched_1',
+    date: '2026-05-31', // 오늘(5월 28일)로부터 3일 뒤
+    time: '14:00',
+    opponent: '타이거 FC',
+    location: '뚝섬 한강축구장 A코트',
+    description: '2026 시즌 친선매치 (유니폼: 홈 에메랄드)'
+  },
+  {
+    id: 'sched_2',
+    date: '2026-06-07', // 10일 뒤
+    time: '10:00',
+    opponent: '블루 드래곤즈',
+    location: '잠실 보조경기장',
+    description: '구청장배 직장인 리그 3차전'
+  },
+  {
+    id: 'sched_3',
+    date: '2026-06-21',
+    time: '09:00',
+    opponent: '불사조 축구단',
+    location: '목동 종합운동장 주경기장',
+    description: '정기 교류 매치'
+  }
+];
 
 class DatabaseService {
   constructor() {
@@ -53,6 +83,9 @@ class DatabaseService {
     if (!localStorage.getItem(STORAGE_KEYS.TACTICS)) {
       localStorage.setItem(STORAGE_KEYS.TACTICS, JSON.stringify([]));
     }
+    if (!localStorage.getItem(STORAGE_KEYS.SCHEDULES)) {
+      localStorage.setItem(STORAGE_KEYS.SCHEDULES, JSON.stringify(DEFAULT_SCHEDULES));
+    }
 
     const config = this.getFirebaseConfig();
     if (config) {
@@ -70,7 +103,6 @@ class DatabaseService {
   // Firebase 초기화 로직
   async initializeFirebase(config) {
     try {
-      // ES 모듈을 사용하여 브라우저에서 동적으로 임포트
       const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js");
       const { getFirestore } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
 
@@ -102,10 +134,8 @@ class DatabaseService {
     }
     localStorage.setItem(STORAGE_KEYS.FIREBASE_CONFIG, JSON.stringify(config));
     
-    // 재초기화 시도
     await this.initializeFirebase(config);
     
-    // 연결이 성공하면 로컬 데이터를 클라우드에 마이그레이션(업로드) 처리
     if (this.isConnected) {
       await this.syncLocalToFirebase();
     }
@@ -125,13 +155,11 @@ class DatabaseService {
     return configStr ? JSON.parse(configStr) : null;
   }
 
-  // LocalStorage 데이터 가져오기 (폴백용)
   getLocalData(key) {
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : null;
   }
 
-  // LocalStorage 데이터 저장
   saveLocalData(key, data) {
     localStorage.setItem(key, JSON.stringify(data));
   }
@@ -147,10 +175,7 @@ class DatabaseService {
           players.push({ id: doc.id, ...doc.data() });
         });
         
-        // 정렬: 배번 또는 포지션에 맞춰 정렬 (기본은 아이디순)
         players.sort((a, b) => Number(a.backNumber || 99) - Number(b.backNumber || 99));
-
-        // 로컬 캐시 갱신
         this.saveLocalData(STORAGE_KEYS.PLAYERS, players);
         return players;
       } catch (error) {
@@ -161,7 +186,6 @@ class DatabaseService {
   }
 
   async savePlayer(player) {
-    // 로컬 데이터 선반영
     const players = await this.getPlayers();
     const index = players.findIndex(p => p.id === player.id);
     if (index > -1) {
@@ -171,11 +195,9 @@ class DatabaseService {
     }
     this.saveLocalData(STORAGE_KEYS.PLAYERS, players);
 
-    // Firebase 동기화
     if (this.isConnected) {
       try {
         const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        // Firebase에 저장 시 id를 문서 ID로 사용하고, 문서 내용에는 id를 제외하고 저장
         const { id, ...playerData } = player;
         await setDoc(doc(this.firestore, "players", id), playerData);
       } catch (error) {
@@ -186,12 +208,10 @@ class DatabaseService {
   }
 
   async deletePlayer(playerId) {
-    // 로컬 데이터 선반영
     let players = await this.getPlayers();
     players = players.filter(p => p.id !== playerId);
     this.saveLocalData(STORAGE_KEYS.PLAYERS, players);
 
-    // 회비 정보에서도 해당 선수 삭제
     const dues = this.getLocalData(STORAGE_KEYS.DUES) || {};
     for (const year in dues) {
       if (dues[year][playerId]) {
@@ -200,14 +220,10 @@ class DatabaseService {
     }
     this.saveLocalData(STORAGE_KEYS.DUES, dues);
 
-    // Firebase 동기화
     if (this.isConnected) {
       try {
         const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
         await deleteDoc(doc(this.firestore, "players", playerId));
-        
-        // Firebase 회비 정보에서도 연동하여 지우거나 비활성화
-        // (단순화를 위해 플레이어 삭제 시 Firestore 회비 도큐먼트의 해당 필드 정리 가능)
         await this.syncDuesToFirebase(dues);
       } catch (error) {
         console.error("Firestore에서 선수 삭제 실패:", error);
@@ -230,7 +246,6 @@ class DatabaseService {
           this.saveLocalData(STORAGE_KEYS.DUES, allDues);
           return duesData;
         } else {
-          // 해당 연도 문서가 없으면 로컬 데이터 반환 및 생성 시도
           const localDues = this.getLocalData(STORAGE_KEYS.DUES) || {};
           const yearDues = localDues[year] || {};
           await this.syncDuesToFirebase(localDues);
@@ -260,7 +275,6 @@ class DatabaseService {
     if (this.isConnected) {
       try {
         const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        // Firestore의 dues 컬렉션에 연도별 문서로 저장
         await setDoc(doc(this.firestore, "dues", String(year)), allDues[year]);
       } catch (error) {
         console.error("Firestore에 회비 저장 실패:", error);
@@ -268,7 +282,6 @@ class DatabaseService {
     }
   }
 
-  // 회비 대용량 동기화 Helper
   async syncDuesToFirebase(allDues) {
     if (!this.isConnected) return;
     try {
@@ -281,25 +294,39 @@ class DatabaseService {
     }
   }
 
-  // 3. 전술 관리
+  // 3. 전술 관리 (애니메이션 프레임 호환 레이어 포함)
   async getTacticalPatterns() {
+    let tactics = [];
     if (this.isConnected) {
       try {
         const { collection, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
         const querySnapshot = await getDocs(collection(this.firestore, "tactics"));
-        const tactics = [];
         querySnapshot.forEach((doc) => {
           tactics.push({ id: doc.id, ...doc.data() });
         });
-        
-        tactics.sort((a, b) => b.createdAt - a.createdAt);
-        this.saveLocalData(STORAGE_KEYS.TACTICS, tactics);
-        return tactics;
       } catch (error) {
         console.warn("Firestore에서 전술 데이터를 불러오지 못해 로컬 데이터를 반환합니다.", error);
+        tactics = this.getLocalData(STORAGE_KEYS.TACTICS) || [];
       }
+    } else {
+      tactics = this.getLocalData(STORAGE_KEYS.TACTICS) || [];
     }
-    return this.getLocalData(STORAGE_KEYS.TACTICS) || [];
+
+    // 마이그레이션 로직: 단일 포지션 방식의 전술 데이터를 프레임 다중 구조로 자동 업그레이드
+    tactics.forEach(t => {
+      if (!t.frames) {
+        t.frames = [{
+          positions: t.positions || { home: [], away: [], ball: {} },
+          drawings: t.drawings || ''
+        }];
+        delete t.positions;
+        delete t.drawings;
+      }
+    });
+
+    tactics.sort((a, b) => b.createdAt - a.createdAt);
+    this.saveLocalData(STORAGE_KEYS.TACTICS, tactics);
+    return tactics;
   }
 
   async saveTacticalPattern(pattern) {
@@ -339,7 +366,67 @@ class DatabaseService {
     }
   }
 
-  // 4. 로컬 데이터를 Firebase에 원클릭 업로드
+  // 4. 경기 일정 관리 (NEW)
+  async getSchedules() {
+    if (this.isConnected) {
+      try {
+        const { collection, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const querySnapshot = await getDocs(collection(this.firestore, "schedules"));
+        const schedules = [];
+        querySnapshot.forEach((doc) => {
+          schedules.push({ id: doc.id, ...doc.data() });
+        });
+        
+        schedules.sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time));
+        this.saveLocalData(STORAGE_KEYS.SCHEDULES, schedules);
+        return schedules;
+      } catch (error) {
+        console.warn("Firestore에서 경기 일정을 불러오지 못해 로컬 데이터를 반환합니다.", error);
+      }
+    }
+    const localShedules = this.getLocalData(STORAGE_KEYS.SCHEDULES) || [];
+    localShedules.sort((a, b) => new Date(a.date + 'T' + (a.time || '00:00')) - new Date(b.date + 'T' + (b.time || '00:00')));
+    return localShedules;
+  }
+
+  async saveSchedule(schedule) {
+    const schedules = await this.getSchedules();
+    const index = schedules.findIndex(s => s.id === schedule.id);
+    if (index > -1) {
+      schedules[index] = schedule;
+    } else {
+      schedules.push(schedule);
+    }
+    this.saveLocalData(STORAGE_KEYS.SCHEDULES, schedules);
+
+    if (this.isConnected) {
+      try {
+        const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const { id, ...scheduleData } = schedule;
+        await setDoc(doc(this.firestore, "schedules", id), scheduleData);
+      } catch (error) {
+        console.error("Firestore에 경기 일정 저장 실패:", error);
+      }
+    }
+    return schedule;
+  }
+
+  async deleteSchedule(scheduleId) {
+    let schedules = await this.getSchedules();
+    schedules = schedules.filter(s => s.id !== scheduleId);
+    this.saveLocalData(STORAGE_KEYS.SCHEDULES, schedules);
+
+    if (this.isConnected) {
+      try {
+        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        await deleteDoc(doc(this.firestore, "schedules", scheduleId));
+      } catch (error) {
+        console.error("Firestore에서 경기 일정 삭제 실패:", error);
+      }
+    }
+  }
+
+  // 5. 로컬 데이터를 Firebase에 원클릭 업로드
   async syncLocalToFirebase() {
     if (!this.isConnected) return;
     console.log("로컬 데이터를 Firebase Firestore로 동기화 업로드 시작...");
@@ -358,11 +445,18 @@ class DatabaseService {
       const localDues = this.getLocalData(STORAGE_KEYS.DUES) || {};
       await this.syncDuesToFirebase(localDues);
 
-      // 3. 전술 업로드
-      const localTactics = this.getLocalData(STORAGE_KEYS.TACTICS) || [];
+      // 3. 전술 업로드 (자동 프레임 구조화 보장)
+      const localTactics = await this.getTacticalPatterns();
       for (const t of localTactics) {
         const { id, ...tacticData } = t;
         await setDoc(doc(this.firestore, "tactics", id), tacticData);
+      }
+
+      // 4. 경기 일정 업로드 (NEW)
+      const localSchedules = this.getLocalData(STORAGE_KEYS.SCHEDULES) || [];
+      for (const s of localSchedules) {
+        const { id, ...scheduleData } = s;
+        await setDoc(doc(this.firestore, "schedules", id), scheduleData);
       }
 
       console.log("모든 로컬 데이터가 Firebase에 업로드 동기화되었습니다!");

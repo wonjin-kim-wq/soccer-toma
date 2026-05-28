@@ -1,5 +1,6 @@
 // tactical-board.js - 적토마 FC 인터랙티브 전술판 모듈
-// 모바일 터치 드래그 지원, 캔버스 그리기(펜/지우개), 포메이션 자동 배치, 전술 스냅샷 저장 연동
+// 모바일 터치 드래그 지원, 캔버스 그리기(펜/지우개), 포메이션 자동 배치
+// [고도화]: 프레임 기반 멀티스텝 타임라인 관리, CSS Transition 스무스 애니메이션 재생 엔진 탑재
 
 import { dbService } from './database.js';
 
@@ -22,6 +23,14 @@ class TacticalBoard {
     this.homePlayers = [];
     this.awayPlayers = [];
     this.ball = null;
+
+    // [고도화]: 애니메이션 프레임 데이터 구조
+    // frames: [ { positions: { home: [], away: [], ball: {} }, drawings: 'dataURL' } ]
+    this.frames = [];
+    this.activeFrameIndex = 0;
+    this.animationTimer = null;
+    this.isPlaying = false;
+    this.frameDuration = 1000; // 프레임 간 전환 속도 (1초)
 
     // 포메이션 좌표 사전 (percentage: [left%, top%])
     this.formations = {
@@ -79,7 +88,7 @@ class TacticalBoard {
           [20, 85],  // H5 (RB)
           [36, 35],  // H6 (LDM)
           [36, 65],  // H7 (RDM)
-          [52, 20],  // H8 (LAM)
+          [52, 20],  // H8 (RAM)
           [55, 50],  // H9 (CAM)
           [52, 80],  // H10 (RAM)
           [72, 50]   // H11 (ST)
@@ -96,14 +105,27 @@ class TacticalBoard {
     this.createPlayers();
     this.setupDrawingEvents();
     this.setupDragEvents();
+    this.setupAnimationEvents(); // 애니메이션 스케줄링 바인딩
     this.loadSavedTacticsList();
+
+    // 초기 1프레임 셋 초기 구성
+    this.resetFrames();
+  }
+
+  // 타임라인 리셋
+  resetFrames() {
+    this.frames = [{
+      positions: this.serializeCurrentPlayerPositions(),
+      drawings: ''
+    }];
+    this.activeFrameIndex = 0;
+    this.updateTimelineIndicator();
   }
 
   // 캔버스 크기 경기장에 일치시키기
   resizeCanvas() {
     const rect = this.pitch.getBoundingClientRect();
     
-    // 임시로 드로잉 내용 백업
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = this.canvas.width;
     tempCanvas.height = this.canvas.height;
@@ -113,36 +135,31 @@ class TacticalBoard {
     this.canvas.width = rect.width;
     this.canvas.height = rect.height;
     
-    // 리사이즈 후 드로잉 복구
     this.ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, rect.width, rect.height);
     
-    // 캔버스 기본 지연 컨텍스트 설정 리셋 방지
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
   }
 
   // 선수단 노드 생성 (홈 11명, 원정 11명, 공 1개)
   createPlayers() {
-    // 기존 동적 플레이어 노드 전체 제거
     const existing = this.pitch.querySelectorAll('.pitch-player');
     existing.forEach(e => e.remove());
 
     this.homePlayers = [];
     this.awayPlayers = [];
 
-    // 1. 홈팀 생성 (파란색 노드, H1 ~ H11)
+    // 1. 홈팀 생성
     for (let i = 1; i <= 11; i++) {
       const p = this.renderPlayerNode(`H${i}`, 'home-player', `홈 ${i}`);
-      // 대기 포지션 (아래쪽 벤치 배치)
       p.style.left = `${5 + (i - 1) * 7.5}%`;
       p.style.top = '93%';
       this.homePlayers.push(p);
     }
 
-    // 2. 원정팀 생성 (빨간색 노드, A1 ~ A11)
+    // 2. 원정팀 생성
     for (let i = 1; i <= 11; i++) {
       const p = this.renderPlayerNode(`A${i}`, 'away-player', `원정 ${i}`);
-      // 대기 포지션 (위쪽 벤치 배치)
       p.style.left = `${5 + (i - 1) * 7.5}%`;
       p.style.top = '1.5%';
       this.awayPlayers.push(p);
@@ -154,7 +171,6 @@ class TacticalBoard {
     this.ball.style.top = '50%';
   }
 
-  // 돔 노드 생성 헬퍼
   renderPlayerNode(numberText, className, labelText) {
     const node = document.createElement('div');
     node.className = `pitch-player ${className}`;
@@ -169,9 +185,12 @@ class TacticalBoard {
     return node;
   }
 
-  // 드래그 앤 드롭 로직 (터치 스크린 호환)
+  // 드래그 앤 드롭 로직 (마우스 & 터치 연동)
   setupDragEvents() {
     const startDrag = (e) => {
+      // 재생 중에는 드래그 차단
+      if (this.isPlaying) return;
+
       const target = e.target.closest('.pitch-player');
       if (!target) return;
       
@@ -199,11 +218,9 @@ class TacticalBoard {
       let x = clientX - pitchRect.left - this.offsetX;
       let y = clientY - pitchRect.top - this.offsetY;
 
-      // 퍼센티지 변환
       let percentX = (x / pitchRect.width) * 100;
       let percentY = (y / pitchRect.height) * 100;
 
-      // 바운더리 체크 (0% ~ 97% 내에서 드래그제한)
       percentX = Math.max(0.5, Math.min(97.5, percentX));
       percentY = Math.max(0.5, Math.min(96.5, percentY));
 
@@ -213,34 +230,35 @@ class TacticalBoard {
 
     const endDrag = () => {
       if (this.draggedElement) {
-        // z-index 원복 (공은 12, 일반 플레이어는 10)
         this.draggedElement.style.zIndex = this.draggedElement.classList.contains('ball') ? 12 : 10;
         this.draggedElement = null;
+
+        // 드래그 종료 후 현재 프레임의 위치 데이터를 자동 저장 캐시
+        this.saveCurrentStateToActiveFrame();
       }
     };
 
-    // 마우스 이벤트
     this.pitch.addEventListener('mousedown', startDrag);
     window.addEventListener('mousemove', moveDrag);
     window.addEventListener('mouseup', endDrag);
 
-    // 터치 이벤트 (모바일 완벽 지원)
     this.pitch.addEventListener('touchstart', startDrag, { passive: false });
     window.addEventListener('touchmove', moveDrag, { passive: false });
     window.addEventListener('touchend', endDrag);
   }
 
-  // 포메이션 불러와서 선수 자동 배치
+  // 포메이션 배치 로직
   applyFormation(formationKey) {
     if (formationKey === 'reset') {
       this.createPlayers();
+      this.saveCurrentStateToActiveFrame();
       return;
     }
 
     const formation = this.formations[formationKey];
     if (!formation) return;
 
-    // 홈팀 배치
+    // 홈팀
     formation.home.forEach((pos, index) => {
       if (this.homePlayers[index]) {
         this.homePlayers[index].style.left = `${pos[0]}%`;
@@ -248,7 +266,7 @@ class TacticalBoard {
       }
     });
 
-    // 원정팀은 데칼코마니(반대칭)로 자동 배치하여 수비 진영 구축
+    // 원정팀 (수비 미러 대칭 배치)
     const getAwayMirrorCoords = (pos) => {
       return [100 - pos[0], 100 - pos[1]];
     };
@@ -256,7 +274,6 @@ class TacticalBoard {
     formation.home.forEach((pos, index) => {
       if (this.awayPlayers[index]) {
         const mirrored = getAwayMirrorCoords(pos);
-        // 원정 골키퍼는 우측 끝에 배치
         if (index === 0) {
           this.awayPlayers[index].style.left = '95%';
           this.awayPlayers[index].style.top = '50%';
@@ -267,14 +284,16 @@ class TacticalBoard {
       }
     });
 
-    // 공은 하프라인 중앙에 배치
     if (this.ball) {
       this.ball.style.left = '50%';
       this.ball.style.top = '50%';
     }
+
+    // 포메이션 저장 후 현재 프레임에 기록 저장
+    this.saveCurrentStateToActiveFrame();
   }
 
-  // 캔버스 그리기 기능 설정
+  // 캔버스 자유 드로잉 로직
   setupDrawingEvents() {
     const getCoordinates = (e) => {
       const rect = this.canvas.getBoundingClientRect();
@@ -287,8 +306,7 @@ class TacticalBoard {
     };
 
     const startDraw = (e) => {
-      // 드래그 가능한 플레이어 위를 누른 경우는 드로잉 패스
-      if (e.target.closest('.pitch-player')) return;
+      if (e.target.closest('.pitch-player') || this.isPlaying) return;
 
       this.isDrawing = true;
       const coords = getCoordinates(e);
@@ -307,7 +325,6 @@ class TacticalBoard {
         this.ctx.lineWidth = this.penWidth;
         this.ctx.globalCompositeOperation = 'source-over';
       } else {
-        // 지우개 모드
         this.ctx.lineWidth = this.eraserWidth;
         this.ctx.globalCompositeOperation = 'destination-out';
       }
@@ -319,20 +336,22 @@ class TacticalBoard {
     };
 
     const stopDraw = () => {
-      this.isDrawing = false;
+      if (this.isDrawing) {
+        this.isDrawing = false;
+        // 드로잉 종료 시 현재 프레임 데이터에 드로잉 Base64 기록 저장
+        this.saveCurrentStateToActiveFrame();
+      }
     };
 
-    // 마우스 그리기
     this.canvas.addEventListener('mousedown', startDraw);
     this.canvas.addEventListener('mousemove', draw);
     window.addEventListener('mouseup', stopDraw);
 
-    // 터치 그리기
     this.canvas.addEventListener('touchstart', startDraw, { passive: false });
     this.canvas.addEventListener('touchmove', draw, { passive: false });
     window.addEventListener('touchend', stopDraw);
 
-    // 드로잉 도구 변환 제어
+    // 색상/도구 변경
     const toolBtns = document.querySelectorAll('.draw-btn[data-tool]');
     toolBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -342,7 +361,6 @@ class TacticalBoard {
       });
     });
 
-    // 드로잉 색상 선택기 제어
     const colorBtns = document.querySelectorAll('.draw-btn[data-color]');
     colorBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -350,15 +368,14 @@ class TacticalBoard {
         btn.classList.add('active');
         this.currentColor = btn.dataset.color;
         
-        // 색상 선택 시 펜 모드로 자동 변환
         const penBtn = document.querySelector('.draw-btn[data-tool="pen"]');
         if (penBtn) penBtn.click();
       });
     });
 
-    // 드로잉 전체 지우기
     document.getElementById('btn-clear-drawings').addEventListener('click', () => {
       this.clearCanvas();
+      this.saveCurrentStateToActiveFrame();
     });
   }
 
@@ -366,9 +383,93 @@ class TacticalBoard {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  // 현재 전술 상태를 데이터 객체로 직렬화
-  getTacticState(name) {
-    const serializePlayerPositions = (players) => {
+  // ==========================================
+  // [고도화]: 애니메이션 및 타임라인 프레임 엔진 구현
+  // ==========================================
+
+  setupAnimationEvents() {
+    // 1. 타임라인 이전/다음 스텝 전환 버튼
+    document.getElementById('btn-anim-prev-frame').addEventListener('click', () => {
+      if (this.isPlaying) return;
+      if (this.activeFrameIndex > 0) {
+        this.saveCurrentStateToActiveFrame(); // 현재 위치 임시저장
+        this.activeFrameIndex--;
+        this.loadFrameState(this.activeFrameIndex);
+        this.updateTimelineIndicator();
+      }
+    });
+
+    document.getElementById('btn-anim-next-frame').addEventListener('click', () => {
+      if (this.isPlaying) return;
+      if (this.activeFrameIndex < this.frames.length - 1) {
+        this.saveCurrentStateToActiveFrame();
+        this.activeFrameIndex++;
+        this.loadFrameState(this.activeFrameIndex);
+        this.updateTimelineIndicator();
+      }
+    });
+
+    // 2. 프레임 추가/삭제 버튼
+    document.getElementById('btn-anim-add-frame').addEventListener('click', () => {
+      if (this.isPlaying) return;
+      this.saveCurrentStateToActiveFrame();
+      
+      // 현재 프레임의 선수 좌표를 바탕으로 새로운 복제 프레임 추가
+      const newFrame = {
+        positions: JSON.parse(JSON.stringify(this.frames[this.activeFrameIndex].positions)),
+        drawings: '' // 드로잉 펜 선은 신규 프레임에서는 깔끔하게 시작
+      };
+
+      this.frames.splice(this.activeFrameIndex + 1, 0, newFrame);
+      this.activeFrameIndex++;
+      this.loadFrameState(this.activeFrameIndex);
+      this.updateTimelineIndicator();
+    });
+
+    document.getElementById('btn-anim-delete-frame').addEventListener('click', () => {
+      if (this.isPlaying) return;
+      if (this.frames.length <= 1) {
+        alert('최소 1개의 전술 스텝이 필요합니다.');
+        return;
+      }
+
+      if (confirm('현재 스텝을 삭제하시겠습니까?')) {
+        this.frames.splice(this.activeFrameIndex, 1);
+        this.activeFrameIndex = Math.max(0, this.activeFrameIndex - 1);
+        this.loadFrameState(this.activeFrameIndex);
+        this.updateTimelineIndicator();
+      }
+    });
+
+    // 3. 재생 / 정지 / 일시정지 컨트롤
+    const btnPlay = document.getElementById('btn-anim-play');
+    const btnPause = document.getElementById('btn-anim-pause');
+    const btnStop = document.getElementById('btn-anim-stop');
+
+    btnPlay.addEventListener('click', () => {
+      this.playAnimation();
+    });
+
+    btnPause.addEventListener('click', () => {
+      this.pauseAnimation();
+    });
+
+    btnStop.addEventListener('click', () => {
+      this.stopAnimation();
+    });
+  }
+
+  // 타임라인 인디케이터 라벨 업데이트 (예: '스텝 2 / 4')
+  updateTimelineIndicator() {
+    const indicator = document.getElementById('anim-frame-indicator');
+    if (indicator) {
+      indicator.textContent = `스텝 ${this.activeFrameIndex + 1} / ${this.frames.length}`;
+    }
+  }
+
+  // 플레이어 포지션 직렬화
+  serializeCurrentPlayerPositions() {
+    const serializePositions = (players) => {
       return players.map(p => ({
         left: p.style.left,
         top: p.style.top
@@ -376,56 +477,176 @@ class TacticalBoard {
     };
 
     return {
+      home: serializePositions(this.homePlayers),
+      away: serializePositions(this.awayPlayers),
+      ball: { left: this.ball.style.left, top: this.ball.style.top }
+    };
+  }
+
+  // 현재 판 배치를 activeFrameIndex 인덱스 프레임 객체에 임시 저장
+  saveCurrentStateToActiveFrame() {
+    if (this.isPlaying) return; // 애니메이션 구동 중에는 수동 세이브 차단
+    
+    this.frames[this.activeFrameIndex] = {
+      positions: this.serializeCurrentPlayerPositions(),
+      drawings: this.canvas.toDataURL()
+    };
+  }
+
+  // 특정 프레임의 데이터를 불러와 전술판에 렌더링
+  loadFrameState(index, useTransition = false) {
+    const frame = this.frames[index];
+    if (!frame) return;
+
+    const players = this.pitch.querySelectorAll('.pitch-player');
+
+    // 재생 중에만 부드러운 트랜지션 클래스 주입 (드래그 시 렉 현상 방지용 최적화)
+    if (useTransition) {
+      players.forEach(p => p.classList.add('animating'));
+    } else {
+      players.forEach(p => p.classList.remove('animating'));
+    }
+
+    // 1. 선수들 포지션 배치
+    frame.positions.home.forEach((pos, idx) => {
+      if (this.homePlayers[idx]) {
+        this.homePlayers[idx].style.left = pos.left;
+        this.homePlayers[idx].style.top = pos.top;
+      }
+    });
+
+    frame.positions.away.forEach((pos, idx) => {
+      if (this.awayPlayers[idx]) {
+        this.awayPlayers[idx].style.left = pos.left;
+        this.awayPlayers[idx].style.top = pos.top;
+      }
+    });
+
+    if (this.ball && frame.positions.ball) {
+      this.ball.style.left = frame.positions.ball.left;
+      this.ball.style.top = frame.positions.ball.top;
+    }
+
+    // 2. 드로잉 복원
+    this.clearCanvas();
+    if (frame.drawings && frame.drawings !== 'data:,') {
+      const img = new Image();
+      img.onload = () => {
+        this.ctx.globalCompositeOperation = 'source-over';
+        this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+      };
+      img.src = frame.drawings;
+    }
+  }
+
+  // 애니메이션 구동 엔진 (재생)
+  playAnimation() {
+    if (this.isPlaying) return;
+    this.saveCurrentStateToActiveFrame(); // 재생 전 현재 프레임 자동 캐싱
+    
+    this.isPlaying = true;
+    
+    // 재생 버튼 토글 UI
+    document.getElementById('btn-anim-play').style.display = 'none';
+    document.getElementById('btn-anim-pause').style.display = 'inline-flex';
+
+    // 전술판 위의 선수단 노드 전체에 스무스 트랜지션 모드(.animating) 강제 주입
+    const players = this.pitch.querySelectorAll('.pitch-player');
+    players.forEach(p => p.classList.add('animating'));
+
+    // 만약 마지막 프레임에서 재생을 누르면 처음부터 다시 재생
+    if (this.activeFrameIndex >= this.frames.length - 1) {
+      this.activeFrameIndex = 0;
+      this.loadFrameState(0, false); // 첫 스텝은 순간이동 배치
+      this.updateTimelineIndicator();
+    }
+
+    const animateNextFrame = () => {
+      if (!this.isPlaying) return;
+
+      if (this.activeFrameIndex < this.frames.length - 1) {
+        this.activeFrameIndex++;
+        this.loadFrameState(this.activeFrameIndex, true); // 좌표 변환하며 smooth transition 작동!
+        this.updateTimelineIndicator();
+
+        // 지정 초(800ms) 뒤 다음 프레임 스케줄링 호출
+        this.animationTimer = setTimeout(animateNextFrame, this.frameDuration);
+      } else {
+        // 끝까지 도달하면 자동 정지
+        this.pauseAnimation();
+        // 재생 완료 알림 피드백 애니메이션 종료
+        setTimeout(() => {
+          players.forEach(p => p.classList.remove('animating'));
+        }, 800);
+      }
+    };
+
+    // 지연 시간 후 재생 사이클 진입
+    this.animationTimer = setTimeout(animateNextFrame, 400);
+  }
+
+  // 일시 정지
+  pauseAnimation() {
+    this.isPlaying = false;
+    if (this.animationTimer) {
+      clearTimeout(this.animationTimer);
+      this.animationTimer = null;
+    }
+
+    document.getElementById('btn-anim-play').style.display = 'inline-flex';
+    document.getElementById('btn-anim-pause').style.display = 'none';
+
+    // 트랜지션 스타일 즉각 제거 (다시 드래그 가능 모드 복구)
+    const players = this.pitch.querySelectorAll('.pitch-player');
+    players.forEach(p => p.classList.remove('animating'));
+  }
+
+  // 재생 처음으로 초기화
+  stopAnimation() {
+    this.pauseAnimation();
+    this.activeFrameIndex = 0;
+    this.loadFrameState(0, false);
+    this.updateTimelineIndicator();
+  }
+
+  // ==========================================
+  // [고도화]: 데이터 직렬화 및 패턴 저장/불러오기 연동
+  // ==========================================
+
+  // 현재 프레임셋 전체 구조 직렬화
+  getTacticState(name) {
+    this.saveCurrentStateToActiveFrame(); // 현재 작업 중이던 최종 스텝 임시 세이브 반영
+    
+    return {
       id: 'tactic_' + Date.now(),
       name: name,
-      positions: {
-        home: serializePlayerPositions(this.homePlayers),
-        away: serializePlayerPositions(this.awayPlayers),
-        ball: { left: this.ball.style.left, top: this.ball.style.top }
-      },
-      // 캔버스 드로잉을 Base64 데이터 이미지로 저장
-      drawings: this.canvas.toDataURL(),
+      // 멀티 프레임 데이터 전체 저장!
+      frames: JSON.parse(JSON.stringify(this.frames)),
       createdAt: Date.now()
     };
   }
 
-  // 직렬화된 전술 상태 불러오기
+  // 전술 데이터 불러와 경기장 구성
   loadTacticState(tactic) {
-    this.clearCanvas();
-    
-    // 1. 선수단 위치 대입
-    tactic.positions.home.forEach((pos, index) => {
-      if (this.homePlayers[index]) {
-        this.homePlayers[index].style.left = pos.left;
-        this.homePlayers[index].style.top = pos.top;
-      }
-    });
+    this.stopAnimation();
 
-    tactic.positions.away.forEach((pos, index) => {
-      if (this.awayPlayers[index]) {
-        this.awayPlayers[index].style.left = pos.left;
-        this.awayPlayers[index].style.top = pos.top;
-      }
-    });
-
-    if (this.ball && tactic.positions.ball) {
-      this.ball.style.left = tactic.positions.ball.left;
-      this.ball.style.top = tactic.positions.ball.top;
+    if (tactic.frames && tactic.frames.length > 0) {
+      // 프레임 데이터 장전
+      this.frames = JSON.parse(JSON.stringify(tactic.frames));
+    } else {
+      // 혹시 구버전 데이터가 있다면 자동 마이그레이션 적용
+      this.frames = [{
+        positions: tactic.positions,
+        drawings: tactic.drawings || ''
+      }];
     }
 
-    // 2. 드로잉 복원
-    if (tactic.drawings) {
-      const img = new Image();
-      img.onload = () => {
-        // 이미지를 캔버스 크기에 맞춰 렌더링
-        this.ctx.globalCompositeOperation = 'source-over';
-        this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
-      };
-      img.src = tactic.drawings;
-    }
+    this.activeFrameIndex = 0;
+    this.loadFrameState(0, false);
+    this.updateTimelineIndicator();
   }
 
-  // 전술 저장 리스트 로드 및 화면 갱신
+  // 전술 리스트 다시 로딩
   async loadSavedTacticsList() {
     const tactics = await dbService.getTacticalPatterns();
     const saveList = document.getElementById('tactic-saved-list');
@@ -435,30 +656,33 @@ class TacticalBoard {
       if (tlist.length === 0) {
         return `<li class="text-muted" style="text-align:center; padding:12px; font-size:0.8rem;">저장된 전술 패턴이 없습니다.</li>`;
       }
-      return tlist.map(t => `
-        <li class="tactic-save-item" data-id="${t.id}">
-          <span class="load-tactic-btn" style="flex:1;">${t.name}</span>
-          <button class="delete-btn" title="삭제"><i class="fa-solid fa-trash"></i></button>
-        </li>
-      `).join('');
+      return tlist.map(t => {
+        const stepCount = t.frames ? t.frames.length : 1;
+        return `
+          <li class="tactic-save-item" data-id="${t.id}">
+            <span class="load-tactic-btn" style="flex:1; cursor:pointer;">
+              ${t.name} <small style="color:var(--primary); font-weight:700; margin-left:4px;">(${stepCount}스텝)</small>
+            </span>
+            <button class="delete-btn" title="삭제"><i class="fa-solid fa-trash"></i></button>
+          </li>
+        `;
+      }).join('');
     };
 
     if (saveList) {
       saveList.innerHTML = renderHtml(tactics);
       
-      // 전술 로드 버튼 바인딩
       saveList.querySelectorAll('.load-tactic-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           const item = e.target.closest('.tactic-save-item');
           const t = tactics.find(tac => tac.id === item.dataset.id);
           if (t) {
             this.loadTacticState(t);
-            alert(`'${t.name}' 전술을 불러왔습니다!`);
+            alert(`'${t.name}' 전술 애니메이션을 불러왔습니다! 하단 재생 버튼을 눌러보세요.`);
           }
         });
       });
 
-      // 전술 삭제 버튼 바인딩
       saveList.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           const item = e.target.closest('.tactic-save-item');
@@ -471,28 +695,31 @@ class TacticalBoard {
       });
     }
 
-    // 대시보드 리스트도 함께 갱신
     if (dashboardList) {
       if (tactics.length === 0) {
         dashboardList.innerHTML = `<li style="text-align:center; padding:16px; color:var(--text-muted); font-size:0.85rem;">저장된 전술 패턴이 없습니다.</li>`;
       } else {
-        dashboardList.innerHTML = tactics.slice(0, 5).map(t => `
-          <li class="tactic-save-item" data-id="${t.id}">
-            <span class="goto-tactics-tab" style="font-weight:600; cursor:pointer;"><i class="fa-solid fa-chalkboard-user" style="margin-right:6px; color:var(--primary);"></i> ${t.name}</span>
-            <small style="color:var(--text-muted); font-size:0.75rem;">${new Date(t.createdAt).toLocaleDateString()}</small>
-          </li>
-        `).join('');
+        dashboardList.innerHTML = tactics.slice(0, 5).map(t => {
+          const stepCount = t.frames ? t.frames.length : 1;
+          return `
+            <li class="tactic-save-item" data-id="${t.id}">
+              <span class="goto-tactics-tab" style="font-weight:600; cursor:pointer;">
+                <i class="fa-solid fa-chalkboard-user" style="margin-right:6px; color:var(--primary);"></i> ${t.name} 
+                <small style="color:var(--accent); font-weight:700;">(${stepCount}스텝)</small>
+              </span>
+              <small style="color:var(--text-muted); font-size:0.75rem;">${new Date(t.createdAt).toLocaleDateString()}</small>
+            </li>
+          `;
+        }).join('');
 
         dashboardList.querySelectorAll('.goto-tactics-tab').forEach(btn => {
           btn.addEventListener('click', (e) => {
-            // 전술판 탭으로 이동하고 해당 전술 장전
             const menuTactics = document.querySelector('[data-target="view-tactics"]');
             if (menuTactics) {
               menuTactics.click();
               const item = e.target.closest('.tactic-save-item');
               const t = tactics.find(tac => tac.id === item.dataset.id);
               if (t) {
-                // 약간의 탭 전환 애니메이션 이후에 그려지도록 타이밍 보장
                 setTimeout(() => {
                   this.loadTacticState(t);
                 }, 200);
@@ -504,7 +731,7 @@ class TacticalBoard {
     }
   }
 
-  // 전술 신규 저장 수행
+  // 전술 영구 세이브
   async saveTactic(name) {
     const tacticState = this.getTacticState(name);
     await dbService.saveTacticalPattern(tacticState);
