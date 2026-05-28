@@ -120,6 +120,72 @@
           </div>
         </div>
 
+        <!-- Statistics Widgets -->
+        <div class="grid-container">
+          <div class="card">
+            <div class="stat-widget">
+              <div class="stat-icon primary">
+                <i class="fa-solid fa-users"></i>
+              </div>
+              <div class="stat-details">
+                <h3 id="stat-total-players">0명</h3>
+                <p>등록 선수단</p>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="stat-widget">
+              <div class="stat-icon accent">
+                <i class="fa-solid fa-futbol"></i>
+              </div>
+              <div class="stat-details">
+                <h3 id="stat-total-goals">0골</h3>
+                <p>시즌 총 득점</p>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="stat-widget">
+              <div class="stat-icon info">
+                <i class="fa-solid fa-wallet"></i>
+              </div>
+              <div class="stat-details">
+                <h3 id="stat-dues-rate">0%</h3>
+                <p>이달의 회비 수납률</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-container" style="grid-template-columns: 1fr 1fr;">
+          <!-- Top Scorer & Assist Leader Card -->
+          <div class="card">
+            <h3 class="card-title"><i class="fa-solid fa-trophy text-amber-500"></i> 기록 리더보드</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+              <div>
+                <h4 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 12px; border-left: 3px solid var(--accent); padding-left: 8px;">최다 득점자 (득점왕)</h4>
+                <div id="dashboard-top-scorers" class="leader-list">
+                  <!-- JS Dynamic Render -->
+                </div>
+              </div>
+              <div>
+                <h4 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 12px; border-left: 3px solid var(--info); padding-left: 8px;">최다 도움자 (도움왕)</h4>
+                <div id="dashboard-top-assisters" class="leader-list">
+                  <!-- JS Dynamic Render -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Tactics & Quick Links -->
+          <div class="card">
+            <h3 class="card-title"><i class="fa-solid fa-signs-post"></i> 최근 저장된 전술 패턴</h3>
+            <ul id="dashboard-recent-tactics" class="tactic-saved-list" style="max-height: 180px;">
+              <!-- JS Dynamic Render -->
+            </ul>
+          </div>
+        </div>
+
         <!-- BEST & WORST MATCH VOTING WIDGET [NEW] -->
         <div id="dashboard-voting-container" class="card" style="display: none; margin-bottom: 24px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.08) 100%); border-color: rgba(59, 130, 246, 0.2); padding: 24px;">
           <h3 class="card-title" style="margin-bottom: 8px;"><i class="fa-solid fa-square-poll-vertical" style="color: var(--info);"></i> 베스트 & 워스트 선수 투표</h3>
@@ -230,72 +296,6 @@
           <div style="text-align: center; margin-top: 14px; font-size: 0.75rem; color: var(--text-muted); display:flex; align-items:center; justify-content:center; gap:6px;">
             <i class="fa-solid fa-circle-info" style="color:var(--primary);"></i>
             <span>선수를 선택하시면 실시간으로 라인업이 자동 저장 및 동기화됩니다.</span>
-          </div>
-        </div>
-
-        <!-- Statistics Widgets -->
-        <div class="grid-container">
-          <div class="card">
-            <div class="stat-widget">
-              <div class="stat-icon primary">
-                <i class="fa-solid fa-users"></i>
-              </div>
-              <div class="stat-details">
-                <h3 id="stat-total-players">0명</h3>
-                <p>등록 선수단</p>
-              </div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="stat-widget">
-              <div class="stat-icon accent">
-                <i class="fa-solid fa-futbol"></i>
-              </div>
-              <div class="stat-details">
-                <h3 id="stat-total-goals">0골</h3>
-                <p>시즌 총 득점</p>
-              </div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="stat-widget">
-              <div class="stat-icon info">
-                <i class="fa-solid fa-wallet"></i>
-              </div>
-              <div class="stat-details">
-                <h3 id="stat-dues-rate">0%</h3>
-                <p>이달의 회비 수납률</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="grid-container" style="grid-template-columns: 1fr 1fr;">
-          <!-- Top Scorer & Assist Leader Card -->
-          <div class="card">
-            <h3 class="card-title"><i class="fa-solid fa-trophy text-amber-500"></i> 기록 리더보드</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-              <div>
-                <h4 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 12px; border-left: 3px solid var(--accent); padding-left: 8px;">최다 득점자 (득점왕)</h4>
-                <div id="dashboard-top-scorers" class="leader-list">
-                  <!-- JS Dynamic Render -->
-                </div>
-              </div>
-              <div>
-                <h4 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 12px; border-left: 3px solid var(--info); padding-left: 8px;">최다 도움자 (도움왕)</h4>
-                <div id="dashboard-top-assisters" class="leader-list">
-                  <!-- JS Dynamic Render -->
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Recent Tactics & Quick Links -->
-          <div class="card">
-            <h3 class="card-title"><i class="fa-solid fa-signs-post"></i> 최근 저장된 전술 패턴</h3>
-            <ul id="dashboard-recent-tactics" class="tactic-saved-list" style="max-height: 180px;">
-              <!-- JS Dynamic Render -->
-            </ul>
           </div>
         </div>
       </section>
