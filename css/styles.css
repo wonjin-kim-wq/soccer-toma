@@ -1663,6 +1663,30 @@ button, input, select, textarea {
   border-color: var(--primary);
 }
 
+/* ========================================== */
+/* 비활성화 위젯 프리미엄 스타일 (Widget Inactive) */
+/* ========================================== */
+
+.card.widget-inactive {
+  opacity: 0.55;
+  position: relative;
+  cursor: pointer !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  filter: grayscale(40%);
+}
+
+.card.widget-inactive:hover {
+  opacity: 0.75;
+  filter: grayscale(10%);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.card.widget-inactive * {
+  pointer-events: none !important;
+}
+
+
 
 
 

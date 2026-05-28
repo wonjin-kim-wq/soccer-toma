@@ -336,7 +336,21 @@ class AppController {
     });
 
     if (pastMatches.length === 0) {
-      votingContainer.style.display = 'none';
+      votingContainer.style.display = 'block';
+      votingContainer.classList.add('widget-inactive');
+      votingTitle.innerHTML = `<i class="fa-solid fa-lock" style="margin-right: 6px;"></i> 베스트/워스트 투표는 경기가 끝난 후에 활성화됩니다.`;
+      votingForm.style.display = 'flex';
+      votingResults.style.display = 'none';
+      
+      // 비활성 시 클릭 핸들러 (중복 바인딩 방지)
+      if (votingContainer.dataset.clickBound !== 'true') {
+        votingContainer.dataset.clickBound = 'true';
+        votingContainer.addEventListener('click', () => {
+          if (votingContainer.classList.contains('widget-inactive')) {
+            alert('🗳️ 베스트/워스트 투표는 경기가 끝난 후 일주일(7일) 동안만 활성화되어 참여하실 수 있습니다!');
+          }
+        });
+      }
       return;
     }
 
@@ -344,6 +358,7 @@ class AppController {
     pastMatches.sort((a, b) => new Date(b.date) - new Date(a.date));
     const targetMatch = pastMatches[0];
 
+    votingContainer.classList.remove('widget-inactive');
     votingContainer.style.display = 'block';
     
     const days = ['일', '월', '화', '수', '목', '금', '토'];
@@ -511,10 +526,23 @@ class AppController {
     }).sort((a, b) => new Date(a.date) - new Date(b.date));
     
     if (upcoming.length === 0) {
-      container.style.display = 'none';
+      container.style.display = 'block';
+      container.classList.add('widget-inactive');
+      title.innerHTML = `<i class="fa-solid fa-lock" style="margin-right: 6px;"></i> 선발 라인업 빌더는 경기 일주일 전부터 활성화됩니다.`;
+      
+      // 비활성 시 클릭 핸들러 (중복 바인딩 방지)
+      if (container.dataset.clickBound !== 'true') {
+        container.dataset.clickBound = 'true';
+        container.addEventListener('click', () => {
+          if (container.classList.contains('widget-inactive')) {
+            alert('⚽ 경기 선발 라인업은 예정된 경기 일주일(7일) 전부터 활성화되어 직접 배치하실 수 있습니다!');
+          }
+        });
+      }
       return;
     }
     
+    container.classList.remove('widget-inactive');
     const targetMatch = upcoming[0];
     container.style.display = 'block';
     
