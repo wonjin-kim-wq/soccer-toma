@@ -116,6 +116,11 @@ class AppController {
         if (targetViewId === 'view-match-feedback') {
           schedulerService.loadSchedules();
         }
+
+        // 개인 피드백 탭 재진입 시 항상 최신 코멘트 히스토리를 띄우고 선택 상태 초기화 [NEW]
+        if (targetViewId === 'view-feedback') {
+          feedbackManager.resetDetailView();
+        }
       });
     });
   }

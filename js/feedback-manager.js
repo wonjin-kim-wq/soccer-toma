@@ -164,6 +164,12 @@ class FeedbackManager {
     if (this.commentsCard) {
       this.commentsCard.style.display = 'none';
     }
+    // 좌측 활성 탭 하이라이트 해제 [NEW]
+    if (this.playerListEl) {
+      this.playerListEl.querySelectorAll('.feedback-player-item').forEach(item => {
+        item.classList.remove('active');
+      });
+    }
     // 히스토리 위젯 노출 및 최신 데이터 동기화 로드 [NEW]
     if (this.historyCardEl) {
       this.historyCardEl.style.display = 'block';
