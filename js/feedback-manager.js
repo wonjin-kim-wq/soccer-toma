@@ -504,14 +504,14 @@ class FeedbackManager {
 
         historyHtml += `
           <div class="feedback-comment-bubble history-item" data-player-id="${bestComment.playerId}" style="cursor: pointer; display: flex; gap: 12px; padding: 16px; border: 2px solid var(--accent); background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(15, 23, 42, 0.95) 100%); border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.15); position: relative;">
-            <div style="position: absolute; top: -12px; right: 16px; background: var(--accent); color: #000; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 20px; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(245,158,11,0.3); white-space: nowrap; z-index: 10;">
+            <div style="position: absolute; top: 12px; right: 16px; background: var(--accent); color: #000; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 20px; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(245,158,11,0.3); white-space: nowrap; z-index: 10;">
               <i class="fa-solid fa-crown"></i> 오늘의 베스트 피드백
             </div>
             <div class="feedback-comment-avatar" style="background: linear-gradient(135deg, var(--accent) 0%, #D97706 100%); flex-shrink: 0;">
               ${initial}
             </div>
             <div class="feedback-comment-details" style="flex: 1; min-width: 0;">
-              <div class="feedback-comment-meta" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 4px;">
+              <div class="feedback-comment-meta" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 4px; padding-right: 120px;">
                 <span class="feedback-comment-writer" style="font-weight: 800; color: #fff; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;">
                   ${bestComment.nickname || '익명'} 
                   <span style="color: var(--accent); font-weight: 800; margin-left: 4px; padding: 2px 6px; background: rgba(245, 158, 11, 0.1); border-radius: 4px; font-size: 0.7rem; white-space: nowrap;">
