@@ -290,12 +290,12 @@ class FeedbackManager {
           <div class="feedback-comment-avatar ${isAnonymous ? 'anonymous' : ''}">
             ${initial}
           </div>
-          <div class="feedback-comment-details">
+          <div class="feedback-comment-details" style="flex: 1; min-width: 0;">
             <div class="feedback-comment-meta">
               <span class="feedback-comment-writer">${c.nickname || '익명'}</span>
               <span class="feedback-comment-time">${timeStr}</span>
             </div>
-            <div class="feedback-comment-text">${c.content}</div>
+            <div class="feedback-comment-text" style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap; word-break: break-all;">${c.content}</div>
             
             <!-- 좋아요 및 싫어요 버튼 [NEW] -->
             <div class="feedback-actions" style="display: flex; gap: 12px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 8px;">
@@ -390,11 +390,40 @@ class FeedbackManager {
            commentDate.getDate() === today.getDate();
   }
 
+  // 사용자 공인 IP 조회 메소드 (중복 추천 방지용) [NEW]
+  async getUserIp() {
+    if (this.cachedIp) return this.cachedIp;
+    try {
+      const res = await fetch('https://api.ipify.org?format=json');
+      const data = await res.json();
+      this.cachedIp = data.ip;
+      return this.cachedIp;
+    } catch (e) {
+      console.warn("IP 조회 실패, 대체 로컬 UUID를 할당합니다.", e);
+      let localId = localStorage.getItem('jeoktoma_fallback_uuid');
+      if (!localId) {
+        localId = 'device_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('jeoktoma_fallback_uuid', localId);
+      }
+      return localId;
+    }
+  }
+
   // 좋아요 및 싫어요 클릭 처리 핸들러 [NEW]
   async handleLikeDislike(playerId, commentId, type) {
     try {
-      await dbService.updateFeedbackCommentLike(playerId, commentId, type);
+      const userIp = await this.getUserIp();
+      const result = await dbService.updateFeedbackCommentLike(playerId, commentId, type, userIp);
       
+      if (!result.success) {
+        if (result.reason === 'already_liked') {
+          alert('이미 이 피드백에 좋아요를 누르셨습니다. (IP당 1회 제한)');
+        } else if (result.reason === 'already_disliked') {
+          alert('이미 이 피드백에 싫어요를 누르셨습니다. (IP당 1회 제한)');
+        }
+        return;
+      }
+
       if (this.selectedPlayerId === playerId) {
         // 상세 타임라인 리로드
         this.comments = await dbService.getFeedback(playerId);
@@ -475,23 +504,23 @@ class FeedbackManager {
 
         historyHtml += `
           <div class="feedback-comment-bubble history-item" data-player-id="${bestComment.playerId}" style="cursor: pointer; display: flex; gap: 12px; padding: 16px; border: 2px solid var(--accent); background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(15, 23, 42, 0.95) 100%); border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.15); position: relative;">
-            <div style="position: absolute; top: -12px; right: 16px; background: var(--accent); color: #000; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 20px; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(245,158,11,0.3);">
+            <div style="position: absolute; top: -12px; right: 16px; background: var(--accent); color: #000; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 20px; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(245,158,11,0.3); white-space: nowrap; z-index: 10;">
               <i class="fa-solid fa-crown"></i> 오늘의 베스트 피드백
             </div>
             <div class="feedback-comment-avatar" style="background: linear-gradient(135deg, var(--accent) 0%, #D97706 100%); flex-shrink: 0;">
               ${initial}
             </div>
-            <div class="feedback-comment-details" style="flex: 1;">
+            <div class="feedback-comment-details" style="flex: 1; min-width: 0;">
               <div class="feedback-comment-meta" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 4px;">
-                <span class="feedback-comment-writer" style="font-weight: 800; color: #fff;">
+                <span class="feedback-comment-writer" style="font-weight: 800; color: #fff; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;">
                   ${bestComment.nickname || '익명'} 
-                  <span style="color: var(--accent); font-weight: 800; margin-left: 4px; padding: 2px 6px; background: rgba(245, 158, 11, 0.1); border-radius: 4px; font-size: 0.7rem;">
+                  <span style="color: var(--accent); font-weight: 800; margin-left: 4px; padding: 2px 6px; background: rgba(245, 158, 11, 0.1); border-radius: 4px; font-size: 0.7rem; white-space: nowrap;">
                     ➡️ ${bestComment.playerName} (${posText})
                   </span>
                 </span>
-                <span class="feedback-comment-time" style="color: var(--text-muted);">${timeStr}</span>
+                <span class="feedback-comment-time" style="color: var(--text-muted); flex-shrink: 0; font-size: 0.7rem;">${timeStr}</span>
               </div>
-              <div class="feedback-comment-text" style="font-size: 0.85rem; color: #fff; line-height: 1.5; white-space: pre-wrap; font-weight: 500;">${bestComment.content}</div>
+              <div class="feedback-comment-text" style="font-size: 0.85rem; color: #fff; line-height: 1.5; white-space: pre-wrap; font-weight: 500; word-break: break-all;">${bestComment.content}</div>
               
               <!-- 좋아요 및 싫어요 버튼 [NEW] -->
               <div class="feedback-actions" style="display: flex; gap: 12px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
@@ -530,17 +559,17 @@ class FeedbackManager {
             <div class="feedback-comment-avatar ${isAnonymous ? 'anonymous' : ''}" style="flex-shrink: 0;">
               ${initial}
             </div>
-            <div class="feedback-comment-details" style="flex: 1;">
+            <div class="feedback-comment-details" style="flex: 1; min-width: 0;">
               <div class="feedback-comment-meta" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 4px;">
-                <span class="feedback-comment-writer" style="font-weight: 800; color: var(--text-primary);">
+                <span class="feedback-comment-writer" style="font-weight: 800; color: var(--text-primary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;">
                   ${c.nickname || '익명'} 
-                  <span style="color: var(--primary); font-weight: 800; margin-left: 4px; padding: 2px 6px; background: rgba(16, 185, 129, 0.08); border-radius: 4px; font-size: 0.7rem;">
+                  <span style="color: var(--primary); font-weight: 800; margin-left: 4px; padding: 2px 6px; background: rgba(16, 185, 129, 0.08); border-radius: 4px; font-size: 0.7rem; white-space: nowrap;">
                     ➡️ ${c.playerName} (${posText})
                   </span>
                 </span>
-                <span class="feedback-comment-time" style="color: var(--text-muted);">${timeStr}</span>
+                <span class="feedback-comment-time" style="color: var(--text-muted); flex-shrink: 0; font-size: 0.7rem;">${timeStr}</span>
               </div>
-              <div class="feedback-comment-text" style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap; margin-bottom: 8px;">${c.content}</div>
+              <div class="feedback-comment-text" style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap; margin-bottom: 8px; word-break: break-all;">${c.content}</div>
               
               <!-- 좋아요 및 싫어요 버튼 [NEW] -->
               <div class="feedback-actions" style="display: flex; gap: 12px; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 6px;">

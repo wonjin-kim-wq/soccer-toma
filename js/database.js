@@ -596,17 +596,29 @@ class DatabaseService {
     return comment;
   }
 
-  async updateFeedbackCommentLike(playerId, commentId, type) {
+  async updateFeedbackCommentLike(playerId, commentId, type, userIp) {
     const allFb = this.getLocalData(STORAGE_KEYS.FEEDBACK) || {};
-    if (!allFb[playerId]) return;
+    if (!allFb[playerId]) return { success: false, reason: 'no_player' };
     
     const comment = allFb[playerId].find(c => c.id === commentId);
     if (comment) {
+      if (!comment.likedIps) comment.likedIps = [];
+      if (!comment.dislikedIps) comment.dislikedIps = [];
+
       if (type === 'likes') {
-        comment.likes = (comment.likes || 0) + 1;
+        if (comment.likedIps.includes(userIp)) {
+          return { success: false, reason: 'already_liked' };
+        }
+        comment.likedIps.push(userIp);
+        comment.likes = comment.likedIps.length;
       } else if (type === 'dislikes') {
-        comment.dislikes = (comment.dislikes || 0) + 1;
+        if (comment.dislikedIps.includes(userIp)) {
+          return { success: false, reason: 'already_disliked' };
+        }
+        comment.dislikedIps.push(userIp);
+        comment.dislikes = comment.dislikedIps.length;
       }
+      
       this.saveLocalData(STORAGE_KEYS.FEEDBACK, allFb);
 
       if (this.isConnected) {
@@ -617,7 +629,9 @@ class DatabaseService {
           console.error("Firestore에 피드백 업데이트 실패:", error);
         }
       }
+      return { success: true };
     }
+    return { success: false, reason: 'not_found' };
   }
 
   // 8. 경기 피드백 유튜브 연동 및 토론장 코멘트 관리 [NEW]
