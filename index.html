@@ -96,6 +96,45 @@
 
       <!-- View 1: Dashboard -->
       <section id="view-dashboard" class="content-view active">
+        <!-- JEOKTOMA EVENT BANNER [NEW] -->
+        <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(254, 242, 242, 0.05) 0%, rgba(251, 113, 133, 0.15) 50%, rgba(244, 63, 94, 0.2) 100%); border: 1px solid rgba(244, 63, 94, 0.3); padding: 18px 24px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: 0 4px 20px rgba(244, 63, 94, 0.1);">
+          <!-- Glowing circle background -->
+          <div style="position: absolute; right: -30px; top: -30px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(244, 63, 94, 0.25) 0%, transparent 70%); pointer-events: none;"></div>
+          
+          <div style="display: flex; align-items: center; gap: 16px; z-index: 2;">
+            <div style="width: 46px; height: 46px; border-radius: 50%; background: rgba(244, 63, 94, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: #F43F5E; border: 1px solid rgba(244, 63, 94, 0.25); flex-shrink: 0;">
+              <i class="fa-solid fa-heart" style="animation: heartBeat 1.5s infinite;"></i>
+            </div>
+            <div style="min-width: 0; flex: 1;">
+              <h4 style="font-size: 1.05rem; font-weight: 800; color: #fff; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="background: linear-gradient(90deg, #F43F5E, #EC4899); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.5px; box-shadow: 0 2px 6px rgba(244, 63, 94, 0.3); white-space: nowrap;">적토마 행사알림</span>
+                <span style="font-size: 0.95rem; font-weight: 800;">박지용 대원 결혼식을 축하해 주세요! 🎉</span>
+              </h4>
+              <p style="font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 6px; min-width: 0;">
+                <span style="display: inline-flex; align-items: center; font-weight: 600; color: #FDA4AF; white-space: nowrap;"><i class="fa-regular fa-clock" style="margin-right: 6px;"></i> 5월 30일 (토) 오후 1시 30분</span>
+                <span style="display: inline-flex; align-items: center; color: var(--text-muted); white-space: nowrap;">|</span>
+                <span style="display: inline-flex; align-items: center; color: var(--text-secondary); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis;"><i class="fa-solid fa-location-dot" style="color: #F43F5E; margin-right: 6px;"></i> 울산 JW컨벤션센터</span>
+              </p>
+            </div>
+          </div>
+          
+          <div style="z-index: 2; display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+            <button onclick="navigator.clipboard.writeText('울산 JW컨벤션센터').then(() => alert('결혼식장 장소가 클립보드에 복사되었습니다! 네비게이션 앱에 붙여넣기 하세요.'))" class="btn btn-secondary" style="font-size: 0.75rem; padding: 6px 12px; border-color: rgba(244, 63, 94, 0.25); background: rgba(255,255,255,0.02); color: #FDA4AF; height: 34px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+              <i class="fa-regular fa-copy" style="margin-right: 4px;"></i> 장소 복사
+            </button>
+          </div>
+        </div>
+
+        <style>
+          @keyframes heartBeat {
+            0% { transform: scale(1); }
+            14% { transform: scale(1.15); }
+            28% { transform: scale(1); }
+            42% { transform: scale(1.15); }
+            70% { transform: scale(1); }
+          }
+        </style>
+
         <!-- NEXT MATCH D-DAY CARD [NEW] -->
         <div id="dashboard-dday-container" class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.08) 100%); border-color: rgba(16, 185, 129, 0.2); padding: 24px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; min-height: 104px;">
           <!-- Glowing background design -->
