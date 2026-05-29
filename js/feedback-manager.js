@@ -40,6 +40,39 @@ class FeedbackManager {
         await this.submitComment();
       });
     }
+
+    // 3. 좋아요 및 싫어요 클릭 이벤트 위임 [NEW]
+    if (this.timelineEl) {
+      this.timelineEl.addEventListener('click', async (e) => {
+        const likeBtn = e.target.closest('.like-btn');
+        const dislikeBtn = e.target.closest('.dislike-btn');
+        if (likeBtn) {
+          e.stopPropagation();
+          const { playerId, commentId } = likeBtn.dataset;
+          await this.handleLikeDislike(playerId, commentId, 'likes');
+        } else if (dislikeBtn) {
+          e.stopPropagation();
+          const { playerId, commentId } = dislikeBtn.dataset;
+          await this.handleLikeDislike(playerId, commentId, 'dislikes');
+        }
+      });
+    }
+
+    if (this.historyListEl) {
+      this.historyListEl.addEventListener('click', async (e) => {
+        const likeBtn = e.target.closest('.like-btn');
+        const dislikeBtn = e.target.closest('.dislike-btn');
+        if (likeBtn) {
+          e.stopPropagation();
+          const { playerId, commentId } = likeBtn.dataset;
+          await this.handleLikeDislike(playerId, commentId, 'likes');
+        } else if (dislikeBtn) {
+          e.stopPropagation();
+          const { playerId, commentId } = dislikeBtn.dataset;
+          await this.handleLikeDislike(playerId, commentId, 'dislikes');
+        }
+      });
+    }
   }
 
   // 외부(app.js)에서 최신 선수 목록을 갱신해줄 때 호출
@@ -241,7 +274,7 @@ class FeedbackManager {
       return;
     }
 
-    // 작성 시간 기준 내림차순 정렬 (최신 댓글이 맨 밑으로 or 맨 위로 - 보통 타임라인은 아래로 갈수록 최신이거나 위로 갈수록 최신. 아래 작성폼이 있으므로 아래가 최신이거나 위가 최신. 최신글을 가장 위에 배치하는 것이 스크롤 편의상 좋음)
+    // 작성 시간 기준 내림차순 정렬 (최신 댓글이 맨 위로)
     const sorted = [...this.comments].sort((a, b) => b.createdAt - a.createdAt);
 
     this.timelineEl.innerHTML = sorted.map(c => {
@@ -249,6 +282,8 @@ class FeedbackManager {
       const initial = isAnonymous ? '익' : c.nickname.substring(0, 1);
       
       const timeStr = this.formatTimeAgo(c.createdAt);
+      const likes = c.likes || 0;
+      const dislikes = c.dislikes || 0;
 
       return `
         <div class="feedback-comment-bubble">
@@ -261,6 +296,20 @@ class FeedbackManager {
               <span class="feedback-comment-time">${timeStr}</span>
             </div>
             <div class="feedback-comment-text">${c.content}</div>
+            
+            <!-- 좋아요 및 싫어요 버튼 [NEW] -->
+            <div class="feedback-actions" style="display: flex; gap: 12px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 8px;">
+              <button class="action-btn like-btn" data-player-id="${this.selectedPlayerId}" data-comment-id="${c.id}" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.1); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; transition: all 0.2s;">
+                <i class="fa-solid fa-thumbs-up" style="color: var(--primary);"></i> 
+                <span>좋아요</span> 
+                <strong class="like-count" style="color: var(--primary);">${likes}</strong>
+              </button>
+              <button class="action-btn dislike-btn" data-player-id="${this.selectedPlayerId}" data-comment-id="${c.id}" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.1); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; transition: all 0.2s;">
+                <i class="fa-solid fa-thumbs-down" style="color: var(--danger);"></i> 
+                <span>싫어요</span> 
+                <strong class="dislike-count" style="color: var(--danger);">${dislikes}</strong>
+              </button>
+            </div>
           </div>
         </div>
       `;
@@ -280,7 +329,9 @@ class FeedbackManager {
       id: 'comment_' + Date.now(),
       nickname,
       content,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      likes: 0,
+      dislikes: 0
     };
 
     try {
@@ -330,6 +381,33 @@ class FeedbackManager {
     }
   }
 
+  // 오늘 날짜인지 판별 헬퍼 [NEW]
+  isToday(timestamp) {
+    const commentDate = new Date(timestamp);
+    const today = new Date();
+    return commentDate.getFullYear() === today.getFullYear() &&
+           commentDate.getMonth() === today.getMonth() &&
+           commentDate.getDate() === today.getDate();
+  }
+
+  // 좋아요 및 싫어요 클릭 처리 핸들러 [NEW]
+  async handleLikeDislike(playerId, commentId, type) {
+    try {
+      await dbService.updateFeedbackCommentLike(playerId, commentId, type);
+      
+      if (this.selectedPlayerId === playerId) {
+        // 상세 타임라인 리로드
+        this.comments = await dbService.getFeedback(playerId);
+        this.renderComments();
+      } else {
+        // 전체 히스토리 리로드
+        await this.loadAllCommentsHistory();
+      }
+    } catch (e) {
+      console.error("반응 처리 실패:", e);
+    }
+  }
+
   // 전체 선수단의 최신 코멘트 히스토리 가져오기 및 렌더링 [NEW]
   async loadAllCommentsHistory() {
     if (!this.historyListEl) return;
@@ -369,10 +447,72 @@ class FeedbackManager {
         return;
       }
 
-      // 상위 10개만 슬라이스하여 표시
+      // [NEW] 당일에 가장 많은 좋아요를 얻은 베스트 피드백 추출 (최소 1개 이상 좋아요)
+      const todayComments = allComments.filter(c => this.isToday(c.createdAt) && (c.likes || 0) > 0);
+      let bestComment = null;
+      if (todayComments.length > 0) {
+        todayComments.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+        bestComment = todayComments[0];
+      }
+
+      // 상위 10개만 슬라이스하여 표시 (베스트 코멘트가 있어도 전체 최신 이력 10개 표시)
       const latestComments = allComments.slice(0, 10);
 
-      this.historyListEl.innerHTML = latestComments.map(c => {
+      let historyHtml = '';
+
+      // 오늘의 베스트 코멘트 카드 추가 [NEW]
+      if (bestComment) {
+        const isAnonymous = !bestComment.nickname || bestComment.nickname === '익명';
+        const initial = isAnonymous ? '익' : bestComment.nickname.substring(0, 1);
+        const timeStr = this.formatTimeAgo(bestComment.createdAt);
+        let posText = '';
+        switch(bestComment.playerPosition) {
+          case 'FW': posText = 'FW'; break;
+          case 'MF': posText = 'MF'; break;
+          case 'DF': posText = 'DF'; break;
+          case 'GK': posText = 'GK'; break;
+        }
+
+        historyHtml += `
+          <div class="feedback-comment-bubble history-item" data-player-id="${bestComment.playerId}" style="cursor: pointer; display: flex; gap: 12px; padding: 16px; border: 2px solid var(--accent); background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(15, 23, 42, 0.95) 100%); border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.15); position: relative;">
+            <div style="position: absolute; top: -12px; right: 16px; background: var(--accent); color: #000; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 20px; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(245,158,11,0.3);">
+              <i class="fa-solid fa-crown"></i> 오늘의 베스트 피드백
+            </div>
+            <div class="feedback-comment-avatar" style="background: linear-gradient(135deg, var(--accent) 0%, #D97706 100%); flex-shrink: 0;">
+              ${initial}
+            </div>
+            <div class="feedback-comment-details" style="flex: 1;">
+              <div class="feedback-comment-meta" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 4px;">
+                <span class="feedback-comment-writer" style="font-weight: 800; color: #fff;">
+                  ${bestComment.nickname || '익명'} 
+                  <span style="color: var(--accent); font-weight: 800; margin-left: 4px; padding: 2px 6px; background: rgba(245, 158, 11, 0.1); border-radius: 4px; font-size: 0.7rem;">
+                    ➡️ ${bestComment.playerName} (${posText})
+                  </span>
+                </span>
+                <span class="feedback-comment-time" style="color: var(--text-muted);">${timeStr}</span>
+              </div>
+              <div class="feedback-comment-text" style="font-size: 0.85rem; color: #fff; line-height: 1.5; white-space: pre-wrap; font-weight: 500;">${bestComment.content}</div>
+              
+              <!-- 좋아요 및 싫어요 버튼 [NEW] -->
+              <div class="feedback-actions" style="display: flex; gap: 12px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+                <button class="action-btn like-btn" data-player-id="${bestComment.playerId}" data-comment-id="${bestComment.id}" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.15); color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; transition: all 0.2s;">
+                  <i class="fa-solid fa-thumbs-up" style="color: var(--primary);"></i> 
+                  <span>좋아요</span> 
+                  <strong class="like-count" style="color: var(--primary);">${bestComment.likes || 0}</strong>
+                </button>
+                <button class="action-btn dislike-btn" data-player-id="${bestComment.playerId}" data-comment-id="${bestComment.id}" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.15); color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; transition: all 0.2s;">
+                  <i class="fa-solid fa-thumbs-down" style="color: var(--danger);"></i> 
+                  <span>싫어요</span> 
+                  <strong class="dislike-count" style="color: var(--danger);">${bestComment.dislikes || 0}</strong>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // 일반 최신 히스토리 목록 렌더링
+      const latestHtml = latestComments.map(c => {
         const isAnonymous = !c.nickname || c.nickname === '익명';
         const initial = isAnonymous ? '익' : c.nickname.substring(0, 1);
         const timeStr = this.formatTimeAgo(c.createdAt);
@@ -387,7 +527,7 @@ class FeedbackManager {
 
         return `
           <div class="feedback-comment-bubble history-item" data-player-id="${c.playerId}" style="cursor: pointer; display: flex; gap: 12px; padding: 14px 16px; transition: all 0.2s;">
-            <div class="feedback-comment-avatar ${isAnonymous ? 'anonymous' : ''}">
+            <div class="feedback-comment-avatar ${isAnonymous ? 'anonymous' : ''}" style="flex-shrink: 0;">
               ${initial}
             </div>
             <div class="feedback-comment-details" style="flex: 1;">
@@ -400,15 +540,34 @@ class FeedbackManager {
                 </span>
                 <span class="feedback-comment-time" style="color: var(--text-muted);">${timeStr}</span>
               </div>
-              <div class="feedback-comment-text" style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap;">${c.content}</div>
+              <div class="feedback-comment-text" style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap; margin-bottom: 8px;">${c.content}</div>
+              
+              <!-- 좋아요 및 싫어요 버튼 [NEW] -->
+              <div class="feedback-actions" style="display: flex; gap: 12px; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 6px;">
+                <button class="action-btn like-btn" data-player-id="${c.playerId}" data-comment-id="${c.id}" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.1); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; transition: all 0.2s;">
+                  <i class="fa-solid fa-thumbs-up" style="color: var(--primary);"></i> 
+                  <span>좋아요</span> 
+                  <strong class="like-count" style="color: var(--primary);">${c.likes || 0}</strong>
+                </button>
+                <button class="action-btn dislike-btn" data-player-id="${c.playerId}" data-comment-id="${c.id}" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.1); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; transition: all 0.2s;">
+                  <i class="fa-solid fa-thumbs-down" style="color: var(--danger);"></i> 
+                  <span>싫어요</span> 
+                  <strong class="dislike-count" style="color: var(--danger);">${c.dislikes || 0}</strong>
+                </button>
+              </div>
             </div>
           </div>
         `;
       }).join('');
 
+      this.historyListEl.innerHTML = historyHtml + latestHtml;
+
       // 히스토리 항목 클릭 시 해당 선수 상세 뷰로 이동
       this.historyListEl.querySelectorAll('.history-item').forEach(item => {
-        item.addEventListener('click', async () => {
+        item.addEventListener('click', async (e) => {
+          // [NEW] 만약 좋아요/싫어요 버튼이나 반응 영역 내부를 클릭했다면 디테일 뷰로 이동하지 않음
+          if (e.target.closest('.action-btn')) return;
+
           const playerId = item.dataset.playerId;
           await this.selectPlayer(playerId);
         });

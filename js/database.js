@@ -596,6 +596,30 @@ class DatabaseService {
     return comment;
   }
 
+  async updateFeedbackCommentLike(playerId, commentId, type) {
+    const allFb = this.getLocalData(STORAGE_KEYS.FEEDBACK) || {};
+    if (!allFb[playerId]) return;
+    
+    const comment = allFb[playerId].find(c => c.id === commentId);
+    if (comment) {
+      if (type === 'likes') {
+        comment.likes = (comment.likes || 0) + 1;
+      } else if (type === 'dislikes') {
+        comment.dislikes = (comment.dislikes || 0) + 1;
+      }
+      this.saveLocalData(STORAGE_KEYS.FEEDBACK, allFb);
+
+      if (this.isConnected) {
+        try {
+          const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+          await setDoc(doc(this.firestore, "feedback", playerId), { comments: allFb[playerId] });
+        } catch (error) {
+          console.error("Firestore에 피드백 업데이트 실패:", error);
+        }
+      }
+    }
+  }
+
   // 8. 경기 피드백 유튜브 연동 및 토론장 코멘트 관리 [NEW]
   async getMatchFeedback(matchId) {
     if (this.isConnected) {
