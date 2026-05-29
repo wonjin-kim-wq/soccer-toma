@@ -15,6 +15,10 @@ class FeedbackManager {
     this.writerInput = document.getElementById('feedback-writer');
     this.contentInput = document.getElementById('feedback-content');
 
+    // 최신 코멘트 히스토리 위젯 엘리먼트 바인딩 [NEW]
+    this.historyCardEl = document.getElementById('feedback-history-card');
+    this.historyListEl = document.getElementById('feedback-history-list');
+
     this.players = [];
     this.selectedPlayerId = null;
     this.comments = [];
@@ -139,6 +143,11 @@ class FeedbackManager {
     if (this.commentsCard) {
       this.commentsCard.style.display = 'block';
     }
+
+    // 4. 히스토리 위젯 숨기기 [NEW]
+    if (this.historyCardEl) {
+      this.historyCardEl.style.display = 'none';
+    }
   }
 
   // 선택 해제 시 디폴트 상태 복구
@@ -154,6 +163,11 @@ class FeedbackManager {
     }
     if (this.commentsCard) {
       this.commentsCard.style.display = 'none';
+    }
+    // 히스토리 위젯 노출 및 최신 데이터 동기화 로드 [NEW]
+    if (this.historyCardEl) {
+      this.historyCardEl.style.display = 'block';
+      this.loadAllCommentsHistory();
     }
   }
 
@@ -307,6 +321,100 @@ class FeedbackManager {
       // 7일 이상 경과 시 정상 날짜 출력
       const date = new Date(timestamp);
       return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+    }
+  }
+
+  // 전체 선수단의 최신 코멘트 히스토리 가져오기 및 렌더링 [NEW]
+  async loadAllCommentsHistory() {
+    if (!this.historyListEl) return;
+
+    this.historyListEl.innerHTML = `
+      <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.8rem; margin-bottom: 12px; color: var(--primary);"></i>
+        <p>최신 피드백 코멘트 히스토리를 불러오는 중입니다...</p>
+      </div>
+    `;
+
+    try {
+      // 모든 선수들의 피드백 데이터를 비동기 병렬로 가져옵니다.
+      const commentsPromises = this.players.map(async (player) => {
+        const playerComments = await dbService.getFeedback(player.id);
+        return playerComments.map(c => ({
+          ...c,
+          playerId: player.id,
+          playerName: player.name,
+          playerPosition: player.position
+        }));
+      });
+
+      const allCommentsNested = await Promise.all(commentsPromises);
+      const allComments = allCommentsNested.flat();
+
+      // 최신순 정렬 (createdAt 기준 내림차순)
+      allComments.sort((a, b) => b.createdAt - a.createdAt);
+
+      if (allComments.length === 0) {
+        this.historyListEl.innerHTML = `
+          <div style="text-align: center; padding: 48px 20px; color: var(--text-muted); font-size: 0.85rem; display:flex; flex-direction:column; align-items:center; gap:8px;">
+            <i class="fa-regular fa-comment-dots" style="font-size: 2rem; opacity:0.4;"></i>
+            아직 작성된 피드백 코멘트가 없습니다.<br>선수단에게 첫 번째 따뜻한 응원을 남겨보세요!
+          </div>
+        `;
+        return;
+      }
+
+      // 상위 10개만 슬라이스하여 표시
+      const latestComments = allComments.slice(0, 10);
+
+      this.historyListEl.innerHTML = latestComments.map(c => {
+        const isAnonymous = !c.nickname || c.nickname === '익명';
+        const initial = isAnonymous ? '익' : c.nickname.substring(0, 1);
+        const timeStr = this.formatTimeAgo(c.createdAt);
+
+        let posText = '';
+        switch(c.playerPosition) {
+          case 'FW': posText = 'FW'; break;
+          case 'MF': posText = 'MF'; break;
+          case 'DF': posText = 'DF'; break;
+          case 'GK': posText = 'GK'; break;
+        }
+
+        return `
+          <div class="feedback-comment-bubble history-item" data-player-id="${c.playerId}" style="cursor: pointer; display: flex; gap: 12px; padding: 14px 16px; transition: all 0.2s;">
+            <div class="feedback-comment-avatar ${isAnonymous ? 'anonymous' : ''}">
+              ${initial}
+            </div>
+            <div class="feedback-comment-details" style="flex: 1;">
+              <div class="feedback-comment-meta" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 4px;">
+                <span class="feedback-comment-writer" style="font-weight: 800; color: var(--text-primary);">
+                  ${c.nickname || '익명'} 
+                  <span style="color: var(--primary); font-weight: 800; margin-left: 4px; padding: 2px 6px; background: rgba(16, 185, 129, 0.08); border-radius: 4px; font-size: 0.7rem;">
+                    ➡️ ${c.playerName} (${posText})
+                  </span>
+                </span>
+                <span class="feedback-comment-time" style="color: var(--text-muted);">${timeStr}</span>
+              </div>
+              <div class="feedback-comment-text" style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap;">${c.content}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // 히스토리 항목 클릭 시 해당 선수 상세 뷰로 이동
+      this.historyListEl.querySelectorAll('.history-item').forEach(item => {
+        item.addEventListener('click', async () => {
+          const playerId = item.dataset.playerId;
+          await this.selectPlayer(playerId);
+        });
+      });
+
+    } catch (e) {
+      console.error("최신 코멘트 히스토리 로드 오류:", e);
+      this.historyListEl.innerHTML = `
+        <div style="text-align: center; padding: 24px; color: var(--danger); font-size: 0.85rem;">
+          코멘트 히스토리를 로드하지 못했습니다: ${e.message}
+        </div>
+      `;
     }
   }
 }
